@@ -14,10 +14,15 @@ class EventBus {
     
     // Enviar historial de eventos al nuevo cliente
     if (this.eventHistory.length > 0) {
-      client.write(`data: ${JSON.stringify({
-        type: 'history',
-        events: this.eventHistory.slice(-10) // Últimos 10 eventos
-      })}\n\n`);
+      try {
+        client.write(`data: ${JSON.stringify({
+          type: 'history',
+          events: this.eventHistory.slice(-10) // Últimos 10 eventos
+        })}\n\n`);
+      } catch (error) {
+        console.error('Error enviando historial al cliente:', error);
+        this.removeClient(client);
+      }
     }
   }
 
@@ -43,8 +48,16 @@ class EventBus {
 
     // Enviar a todos los clientes
     const message = `data: ${JSON.stringify(eventData)}\n\n`;
+    const clientsToRemove = [];
+    
     this.clients.forEach(client => {
       try {
+        // Verificar si la conexión sigue activa
+        if (client.destroyed || client.writableEnded) {
+          clientsToRemove.push(client);
+          return;
+        }
+        
         // Filtrar eventos newTrend si están en blacklist
         if (eventData.type === 'newTrend') {
           const key = `${eventData.data?.trendLink || ''}|${eventData.data?.newsletterId ?? 'null'}`;
@@ -53,9 +66,12 @@ class EventBus {
         client.write(message);
       } catch (error) {
         console.error('Error enviando evento a cliente:', error);
-        this.removeClient(client);
+        clientsToRemove.push(client);
       }
     });
+    
+    // Remover clientes con errores
+    clientsToRemove.forEach(client => this.removeClient(client));
 
     console.log(`📡 Evento broadcast enviado: ${event.type} a ${this.clients.size} clientes`);
   }

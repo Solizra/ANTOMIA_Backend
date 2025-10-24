@@ -3,7 +3,7 @@ name: Actualizar relaciones de noticias
 on:
   schedule:
     # - cron: "*/30 * * * *" # 🕒 Cada 30 minutos
-    - cron: "0 3 * * *"  # 💤 Una vez al día a las 3 AM UTC (descomentar esta línea si querés volver al modo diario)
+    - cron: "0 3 * * *"  # 💤 Una vez al día a las 3 AM UTC (descomentar para modo diario)
   workflow_dispatch:       # permite ejecutarlo manualmente desde GitHub
 
 jobs:
@@ -31,5 +31,5 @@ jobs:
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
           echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
 
-      - name: Ejecutar agente
-        run: node Agent/main.js
+      - name: Ejecutar script de la API de noticias
+        run: node APIs/buscarNoticias.mjs

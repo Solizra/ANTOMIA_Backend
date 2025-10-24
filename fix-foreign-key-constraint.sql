@@ -1,55 +1,57 @@
--- Script para corregir la restricción de clave foránea entre Feedback y Trends
+-- Script para solucionar problemas de clave foránea en la tabla Trends
 -- Ejecutar como: psql -U postgres -d climatetech_db -f fix-foreign-key-constraint.sql
 
--- Conectar a la base de datos
-\c climatetech_db;
-
--- Verificar si la restricción ya existe
-DO $$
-BEGIN
-    -- Verificar si la restricción de clave foránea ya existe
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.table_constraints 
-        WHERE constraint_name = 'Feedback_trendId_fkey' 
-        AND table_name = 'Feedback'
-    ) THEN
-        -- Agregar la restricción de clave foránea con CASCADE DELETE
-        ALTER TABLE "Feedback" 
-        ADD CONSTRAINT "Feedback_trendId_fkey" 
-        FOREIGN KEY ("trendId") 
-        REFERENCES "Trends"("id") 
-        ON DELETE CASCADE;
-        
-        RAISE NOTICE 'Restricción de clave foránea agregada exitosamente';
-    ELSE
-        RAISE NOTICE 'La restricción de clave foránea ya existe';
-    END IF;
-END $$;
-
--- Verificar la estructura actual
+-- 1. Verificar trends con id_newsletter que no existen
 SELECT 
-    tc.constraint_name, 
-    tc.table_name, 
-    kcu.column_name, 
-    ccu.table_name AS foreign_table_name,
-    ccu.column_name AS foreign_column_name,
-    rc.delete_rule
-FROM information_schema.table_constraints AS tc 
-JOIN information_schema.key_column_usage AS kcu
-    ON tc.constraint_name = kcu.constraint_name
-JOIN information_schema.constraint_column_usage AS ccu
-    ON ccu.constraint_name = tc.constraint_name
-JOIN information_schema.referential_constraints AS rc
-    ON tc.constraint_name = rc.constraint_name
-WHERE tc.constraint_type = 'FOREIGN KEY' 
-AND tc.table_name = 'Feedback';
+    t.id,
+    t."id_newsletter",
+    t."Título_del_Trend",
+    t."Link_del_Trend"
+FROM "Trends" t
+LEFT JOIN "Newsletter" n ON t."id_newsletter" = n.id
+WHERE t."id_newsletter" IS NOT NULL 
+  AND n.id IS NULL;
 
--- Mensaje de confirmación
+-- 2. Actualizar trends con id_newsletter inválido a NULL
+UPDATE "Trends" 
+SET "id_newsletter" = NULL
+WHERE "id_newsletter" IS NOT NULL 
+  AND "id_newsletter" NOT IN (SELECT id FROM "Newsletter");
+
+-- 3. Verificar que no quedan referencias inválidas
+SELECT 
+    COUNT(*) as trends_con_referencias_invalidas
+FROM "Trends" t
+LEFT JOIN "Newsletter" n ON t."id_newsletter" = n.id
+WHERE t."id_newsletter" IS NOT NULL 
+  AND n.id IS NULL;
+
+-- 4. Mostrar estadísticas finales
+SELECT 
+    'Trends con newsletter válido' as descripcion,
+    COUNT(*) as cantidad
+FROM "Trends" t
+INNER JOIN "Newsletter" n ON t."id_newsletter" = n.id
+UNION ALL
+SELECT 
+    'Trends sin newsletter (NULL)',
+    COUNT(*)
+FROM "Trends" 
+WHERE "id_newsletter" IS NULL
+UNION ALL
+SELECT 
+    'Total de trends',
+    COUNT(*)
+FROM "Trends";
+
+-- 5. Verificar integridad de claves foráneas
+SELECT 
+    conname as constraint_name,
+    contype as constraint_type
+FROM pg_constraint 
+WHERE conrelid = 'Trends'::regclass 
+  AND contype = 'f';
+
 \echo '========================================'
-\echo 'RESTRICCIÓN DE CLAVE FORÁNEA CONFIGURADA'
-\echo '========================================'
-\echo 'La tabla Feedback ahora tiene CASCADE DELETE'
-\echo 'Los registros de Feedback se eliminarán automáticamente'
-\echo 'cuando se elimine el trend relacionado'
+\echo 'LIMPIEZA DE CLAVES FORÁNEAS COMPLETADA'
 \echo '========================================'

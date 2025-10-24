@@ -64,14 +64,24 @@ export default class TrendsRepository {
         Relacionado: coerceBoolean(record.Relacionado),
         Analisis_relacion: safeText(record.Analisis_relacion)
       };
-      // Completar nombre de newsletter si viene vacío pero hay id_newsletter
-      if ((!clean.Nombre_Newsletter_Relacionado || clean.Nombre_Newsletter_Relacionado.trim() === '') && clean.id_newsletter != null) {
+      // Validar que el newsletter existe si se proporciona id_newsletter
+      if (clean.id_newsletter != null) {
         try {
-          const nlRes = await client.query('SELECT "titulo" FROM "Newsletter" WHERE "id" = $1 LIMIT 1', [clean.id_newsletter]);
-          const t = nlRes.rows?.[0]?.titulo;
-          if (t) clean.Nombre_Newsletter_Relacionado = t;
+          const nlRes = await client.query('SELECT "id", "titulo" FROM "Newsletter" WHERE "id" = $1 LIMIT 1', [clean.id_newsletter]);
+          if (nlRes.rows.length === 0) {
+            console.warn(`⚠️ Newsletter con ID ${clean.id_newsletter} no existe. Estableciendo id_newsletter a null.`);
+            clean.id_newsletter = null;
+          } else {
+            // Completar nombre de newsletter si viene vacío
+            if (!clean.Nombre_Newsletter_Relacionado || clean.Nombre_Newsletter_Relacionado.trim() === '') {
+              const t = nlRes.rows[0].titulo;
+              if (t) clean.Nombre_Newsletter_Relacionado = t;
+            }
+          }
         } catch (e) {
-          console.error('Error obteniendo titulo de Newsletter para completar nombre relacionado:', e);
+          console.error('Error validando newsletter:', e.message);
+          console.warn(`⚠️ Error validando newsletter ID ${clean.id_newsletter}. Estableciendo a null.`);
+          clean.id_newsletter = null;
         }
       }
       // Chequeo de duplicados: misma noticia (Link_del_Trend) y mismo newsletter (id_newsletter o nombre relacionado)

@@ -59,18 +59,32 @@ app.post('/api/Newsletter/analizar', async (req, res) => {
 
 // Endpoint para Server-Sent Events (SSE) - Actualización en tiempo real
 app.get('/api/events', (req, res) => {
-  // Configurar headers para SSE
+  console.log('🔌 Nueva conexión SSE solicitada desde:', req.headers.origin || req.headers.host);
+  
+  // Configurar headers para SSE con CORS completo
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
     'Connection': 'keep-alive',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control'
+    'Access-Control-Allow-Headers': 'Cache-Control, Connection, Accept, Origin, X-Requested-With, Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+    'X-Accel-Buffering': 'no' // Deshabilitar buffering de nginx si está presente
   });
 
   // Enviar heartbeat cada 30 segundos para mantener la conexión
   const heartbeat = setInterval(() => {
-    res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: new Date().toISOString() })}\n\n`);
+    try {
+      if (!res.destroyed) {
+        res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: new Date().toISOString() })}\n\n`);
+      }
+    } catch (error) {
+      console.error('Error enviando heartbeat:', error);
+      clearInterval(heartbeat);
+    }
   }, 30000);
 
   // Agregar cliente al EventBus
@@ -78,17 +92,43 @@ app.get('/api/events', (req, res) => {
 
   // Manejar desconexión del cliente
   req.on('close', () => {
+    console.log('🔌 Cliente SSE desconectado');
+    clearInterval(heartbeat);
+    eventBus.removeClient(res);
+  });
+
+  // Manejar errores de conexión
+  req.on('error', (error) => {
+    console.error('❌ Error en conexión SSE:', error);
     clearInterval(heartbeat);
     eventBus.removeClient(res);
   });
 
   // Enviar evento de conexión exitosa
-  res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: new Date().toISOString() })}\n\n`);
+  try {
+    res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: new Date().toISOString() })}\n\n`);
+    console.log('✅ Conexión SSE establecida exitosamente');
+  } catch (error) {
+    console.error('❌ Error enviando mensaje de conexión:', error);
+  }
 });
 
 // Endpoint para obtener estadísticas del EventBus
 app.get('/api/events/stats', (req, res) => {
   res.json(eventBus.getStats());
+});
+
+// Endpoint de salud para verificar el estado del servidor
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    sse: {
+      connectedClients: eventBus.getStats().connectedClients,
+      totalEvents: eventBus.getStats().totalEvents
+    }
+  });
 });
 
 // Endpoint manual para probar la búsqueda de noticias
