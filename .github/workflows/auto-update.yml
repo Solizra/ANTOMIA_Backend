@@ -1,0 +1,37 @@
+name: Actualizar relaciones de noticias
+
+on:
+  schedule:
+    
+    - cron: "*/30 * * * *" # 🕒 Cada 30 minutos
+    # - cron: "0 3 * * *" # 💤 Una vez al día a las 3 AM UTC (descomentar esta línea si querés volver al modo diario)
+
+  workflow_dispatch:       # permite ejecutarlo manualmente desde GitHub
+
+jobs:
+  run-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias
+        run: npm install
+
+       - name: Crear archivo .env con las variables
+        run: |
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+          echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> .env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+
+      - name: Ejecutar agente
+        run: node Agent/main.js
