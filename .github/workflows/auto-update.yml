@@ -2,13 +2,14 @@ name: Actualizar relaciones de noticias
 
 on:
   schedule:
-    # - cron: "*/30 * * * *" # 🕒 Cada 30 minutos
-    - cron: "0 3 * * *"  # 💤 Una vez al día a las 3 AM UTC (descomentar para modo diario)
+    - cron: "*/30 * * * *" # 🕒 Cada 30 minutos
+    # - cron: "0 3 * * *"  # 💤 Una vez al día a las 3 AM UTC (descomentar para modo diario)
   workflow_dispatch:       # permite ejecutarlo manualmente desde GitHub
 
 jobs:
   run-update:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # Timeout de 15 minutos para evitar ejecuciones muy largas
 
     steps:
       - name: Clonar el repositorio
@@ -32,4 +33,9 @@ jobs:
           echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
 
       - name: Ejecutar script de la API de noticias
-        run: node APIs/buscarNoticias.mjs
+        run: |
+          echo "🚀 Iniciando búsqueda de noticias..."
+          echo "⏰ Timestamp: $(date)"
+          node APIs/buscarNoticias.mjs --limit=1
+          echo "✅ Búsqueda completada"
+          echo "⏰ Timestamp final: $(date)"
