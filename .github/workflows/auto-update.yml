@@ -31,6 +31,7 @@ jobs:
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
           echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+          echo "API_URL=${{secrets.API_URL}}" >> .env
 
       - name: Ejecutar script de la API de noticias
         run: |
