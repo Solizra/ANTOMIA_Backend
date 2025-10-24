@@ -1,0 +1,48 @@
+name: Import Substack Feed
+
+on:
+  schedule:
+    # Ejecutar cada 14 días a las 2:00 AM UTC
+    - cron: '0 2 */14 * *'
+  workflow_dispatch: # Permitir ejecución manual
+
+jobs:
+  import-substack:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Set environment variables
+      run: |
+        echo "DB_HOST=${{ secrets.DB_HOST }}" >> $GITHUB_ENV
+        echo "DB_NAME=${{ secrets.DB_NAME }}" >> $GITHUB_ENV
+        echo "DB_USER=${{ secrets.DB_USER }}" >> $GITHUB_ENV
+        echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> $GITHUB_ENV
+        echo "DB_PORT=${{ secrets.DB_PORT }}" >> $GITHUB_ENV
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
+        
+    - name: Import Substack Feed
+      run: |
+        echo "🚀 Iniciando importación de feed Substack..."
+        node APIs/importSubstack.mjs
+        
+    - name: Notify completion
+      if: always()
+      run: |
+        if [ $? -eq 0 ]; then
+          echo "✅ Importación de Substack completada exitosamente"
+        else
+          echo "❌ Error en la importación de Substack"
+          exit 1
+        fi

@@ -81,4 +81,21 @@ export function scheduleSubstackImport() {
   }, intervalMs);
 }
 
+// Función para ejecutar desde línea de comandos
+async function ejecutarImportSubstack() {
+  try {
+    console.log('🚀 Ejecutando importación de Substack desde GitHub Actions...');
+    const result = await importSubstackFeed();
+    console.log('✅ Importación completada:', result);
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error en importación de Substack:', error);
+    process.exit(1);
+  }
+}
+
+// Si se ejecuta directamente este archivo, ejecutar la importación
+if (process.argv[1] && process.argv[1].includes('importSubstack.mjs')) {
+  ejecutarImportSubstack();
+}
 

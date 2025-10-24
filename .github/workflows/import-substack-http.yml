@@ -1,0 +1,40 @@
+name: Import Substack Feed (HTTP)
+
+on:
+  schedule:
+    # Ejecutar cada 14 días a las 2:00 AM UTC
+    - cron: '0 2 */14 * *'
+  workflow_dispatch: # Permitir ejecución manual
+
+jobs:
+  import-substack-http:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Import Substack Feed via HTTP
+      run: |
+        echo "🚀 Iniciando importación de feed Substack via HTTP..."
+        
+        # Hacer petición al endpoint del servidor
+        response=$(curl -s -X POST "https://antomia-backend.onrender.com/api/newsletters/import-substack-now" \
+          -H "Content-Type: application/json" \
+          -w "HTTPSTATUS:%{http_code}")
+        
+        # Extraer código de estado HTTP
+        http_code=$(echo $response | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+        body=$(echo $response | sed -e 's/HTTPSTATUS:.*//g')
+        
+        echo "📊 Respuesta del servidor:"
+        echo "$body"
+        
+        if [ $http_code -eq 200 ]; then
+          echo "✅ Importación de Substack completada exitosamente"
+        else
+          echo "❌ Error en la importación de Substack (HTTP $http_code)"
+          exit 1
+        fi
+        
+    - name: Notify completion
+      if: always()
+      run: |
+        echo "🏁 Workflow de importación de Substack finalizado"
