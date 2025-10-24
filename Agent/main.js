@@ -893,6 +893,12 @@ export async function obtenerNewslettersBDD() {
       }
       
       console.log(`✅ Se obtuvieron ${newsletters.length} newsletters de la BDD`);
+      
+      // Validar que hay newsletters disponibles
+      if (newsletters.length === 0) {
+        console.error(`❌ No se encontraron newsletters en la base de datos. El proceso no puede continuar.`);
+        throw new Error('No hay newsletters disponibles para el análisis');
+      }
           
       return newsletters;
     } catch (fetchError) {
@@ -920,6 +926,13 @@ export async function obtenerNewslettersBDD() {
       await pool.end();
       
       console.log(`✅ Obtenidos ${result.rows.length} newsletters directamente de la base de datos`);
+      
+      // Validar que hay newsletters disponibles
+      if (result.rows.length === 0) {
+        console.error(`❌ No se encontraron newsletters en la base de datos. El proceso no puede continuar.`);
+        throw new Error('No hay newsletters disponibles para el análisis');
+      }
+      
       return result.rows;
     } catch (dbError) {
       console.error('❌ Error también al acceder directamente a la base de datos:', dbError);
@@ -1425,6 +1438,12 @@ export async function procesarUrlsYPersistir(items = []) {
             };
             const createdTrend = await trendsSvc.createAsync(payload);
             
+            // Verificar si es un duplicado
+            if (createdTrend?.duplicated) {
+              console.log(`⛔ Trend duplicado detectado para ${url} con newsletter ${nl.id}. Saltando esta relación específica.`);
+              continue; // Saltar solo esta relación, continuar con las demás
+            }
+            
             if (createdTrend && createdTrend.id) {
               trendsInsertados++;
               
@@ -1468,6 +1487,12 @@ export async function procesarUrlsYPersistir(items = []) {
             Analisis_relacion: (resultado.motivoSinRelacion || '').trim() || 'Noticia climatech sin newsletters relacionados'
           };
           const createdTrend = await trendsSvc.createAsync(payload);
+          
+          // Verificar si es un duplicado
+          if (createdTrend?.duplicated) {
+            console.log(`⛔ Trend duplicado detectado para ${url} sin newsletter. Saltando esta noticia específica.`);
+            continue; // Saltar solo esta noticia, continuar con las demás
+          }
           
           if (createdTrend && createdTrend.id) {
             trendsInsertados++;
