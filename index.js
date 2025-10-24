@@ -161,13 +161,21 @@ app.post('/api/newsletters/import-substack-now', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
-  // Iniciar scheduler que busca noticias y las procesa con el agente automáticamente
+  // Ejecutar búsqueda de noticias una sola vez al iniciar el servidor
   try {
-    iniciarProgramacionAutomatica();
+    console.log('🚀 Iniciando búsqueda de noticias...');
+    const { buscarNoticias } = await import('./APIs/buscarNoticias.mjs');
+    buscarNoticias().then(() => {
+      console.log('✅ Búsqueda de noticias completada');
+    }).catch((error) => {
+      console.error('❌ Error en búsqueda de noticias:', error);
+    });
+    
+    // Programar import de Substack
     scheduleSubstackImport();
   } catch (e) {
-    console.error('Error iniciando la programación automática:', e);
+    console.error('Error iniciando la búsqueda de noticias:', e);
   }
 });

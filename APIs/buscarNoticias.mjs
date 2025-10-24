@@ -394,16 +394,8 @@ async function buscarNoticias(maxResults = 3) { // limitado a 3 noticias máximo
   
 }
 
-// Función para iniciar la programación automática
+// Función para iniciar la programación automática (solo limpieza diaria)
 function iniciarProgramacionAutomatica() {
-  
-  
-  // Esperar 10 segundos para que el frontend se conecte al SSE
-  console.log('⏳ Esperando 10 segundos para que el frontend se conecte...');
-  setTimeout(() => {
-    buscarNoticias();
-  }, 10000);
-  
   // Programar limpieza UNA VEZ AL DÍA a las 03:00 AM
   cron.schedule('0 3 * * *', () => {
     try {
