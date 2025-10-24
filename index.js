@@ -10,7 +10,7 @@ import FuentesRouter from './Controllers/Fuentes-controller.js'
 import FeedbackRouter from './Controllers/Feedback-controller.js'
 import { analizarNoticiaEstructurada } from './Agent/main.js';
 import { iniciarProgramacionAutomatica } from './APIs/buscarNoticias.mjs';
-import { importSubstackFeed, scheduleSubstackImport } from './APIs/importSubstack.mjs';
+import { importSubstackFeed } from './APIs/importSubstack.mjs';
 import eventBus from './EventBus.js';
 import { apiURL } from './constants.js';
 const app = express();
@@ -174,8 +174,7 @@ app.listen(port, async () => {
       console.error('❌ Error en búsqueda de noticias:', error);
     });
     
-    // Programar import de Substack
-    scheduleSubstackImport();
+    // Import de Substack ahora se maneja via GitHub Actions cada 14 días
   } catch (e) {
     console.error('Error iniciando la búsqueda de noticias:', e);
   }
