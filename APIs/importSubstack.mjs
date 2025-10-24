@@ -14,11 +14,27 @@ export async function importSubstackFeed() {
   let duplicados = 0;
 
   try {
+    console.log('🔍 Intentando acceder al feed de Substack...');
     const res = await fetch(FEED_URL, {
       agent: httpsAgent,
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+      },
+      timeout: 30000  // 30 segundos de timeout
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    
+    if (!res.ok) {
+      console.error(`❌ Error HTTP ${res.status}: ${res.statusText}`);
+      console.error('📋 Headers de respuesta:', Object.fromEntries(res.headers.entries()));
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    
+    console.log('✅ Feed obtenido exitosamente');
     const xml = await res.text();
     const $ = cheerio.load(xml, { xmlMode: true });
 
@@ -40,22 +56,35 @@ export async function importSubstackFeed() {
     }
 
     total = entries.length;
+    console.log(`📊 Total de entradas encontradas: ${total}`);
+    
     for (const { title, link } of entries) {
       try {
         const u = new URL(link);
-        if (u.hostname.toLowerCase() !== 'pulsobyantom.substack.com') continue;
+        if (u.hostname.toLowerCase() !== 'pulsobyantom.substack.com') {
+          console.log(`⏭️ Saltando entrada de dominio diferente: ${u.hostname}`);
+          continue;
+        }
 
+        console.log(`🔄 Procesando: ${title}`);
         const { titulo: t2, resumen } = await resumirDesdeUrl(link);
         const tituloFinal = title || t2 || '';
         const created = await svc.createOrIgnoreAsync({ link, Resumen: resumen || '', titulo: tituloFinal });
-        if (created?.duplicated) duplicados += 1;
-        else nuevos += 1;
+        if (created?.duplicated) {
+          duplicados += 1;
+          console.log(`⛔ Duplicado: ${title}`);
+        } else {
+          nuevos += 1;
+          console.log(`✅ Nuevo: ${title}`);
+        }
       } catch (e) {
-        console.error('Error procesando link:', link, e);
+        console.error('❌ Error procesando link:', link, e?.message || e);
       }
     }
+    
+    console.log(`📈 Resumen final: ${nuevos} nuevos, ${duplicados} duplicados de ${total} total`);
   } catch (e) {
-    console.error('Error general importando feed:', e);
+    console.error('❌ Error general importando feed:', e?.message || e);
     throw e; // esto hará que el workflow marque failure
   }
 

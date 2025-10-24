@@ -9,6 +9,7 @@ on:
 jobs:
   import-substack:
     runs-on: ubuntu-latest
+    timeout-minutes: 30  # Timeout de 30 minutos
     
     steps:
       - name: Checkout repository
@@ -17,27 +18,30 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'  # Cambiado de 18 a 20
           cache: 'npm'
         
       - name: Install dependencies
         run: npm ci
       
-      - name: Set environment variables
+      - name: Create .env file with environment variables
         run: |
-          echo "DB_HOST=${{ secrets.DB_HOST }}" >> $GITHUB_ENV
-          echo "DB_NAME=${{ secrets.DB_NAME }}" >> $GITHUB_ENV
-          echo "DB_USER=${{ secrets.DB_USER }}" >> $GITHUB_ENV
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> $GITHUB_ENV
-          echo "DB_PORT=${{ secrets.DB_PORT }}" >> $GITHUB_ENV
-          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
-          echo "API_URL=${{secrets.API_URL}}" >> $GITHUB_ENV
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+          echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> .env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+          echo "API_URL=${{secrets.API_URL}}" >> .env
 
         
       - name: Import Substack Feed
         run: |
           echo "🚀 Iniciando importación de feed Substack..."
+          echo "⏰ Timestamp: $(date)"
           node APIs/importSubstack.mjs
+          echo "✅ Importación completada"
+          echo "⏰ Timestamp final: $(date)"
 
       - name: Notify completion
         if: success()
