@@ -432,6 +432,6 @@ if (process.argv[1] && process.argv[1].includes('buscarNoticias.mjs')) {
   } else {
     // Para GitHub Actions, ejecutar una sola vez con límite reducido
     console.log('🤖 Ejecutando en modo GitHub Actions (una sola vez)...');
-    ejecutarUnaVez(limit || 2); // Limitar a 2 noticias máximo para GitHub Actions
+    ejecutarUnaVez(limit || 3); // Limitar a 3 noticias máximo para GitHub Actions
   }
 }

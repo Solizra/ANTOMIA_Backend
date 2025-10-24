@@ -36,6 +36,6 @@ jobs:
         run: |
           echo "🚀 Iniciando búsqueda de noticias..."
           echo "⏰ Timestamp: $(date)"
-          node APIs/buscarNoticias.mjs --limit=1
+          node APIs/buscarNoticias.mjs --limit=3
           echo "✅ Búsqueda completada"
           echo "⏰ Timestamp final: $(date)"
