@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import TrendsService from '../Services/Trends-services.js';
 import FeedbackService from '../Services/Feedback-service.js';
 import eventBus from '../EventBus.js';
+import { getBackendUrl } from '../constants.js';
 
 import OpenAI from "openai";
 // Configuración
@@ -860,9 +861,15 @@ export async function obtenerNewslettersBDD() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
     
-    try {
-      // Solicitar todos los newsletters sin límite de paginación
-      const response = await fetch('http://localhost:3000/api/Newsletter?limit=10000&page=1', {
+      try {
+        // Determinar la URL del backend
+        const baseUrl = getBackendUrl();
+        const apiUrl = `${baseUrl}/api/Newsletter?limit=10000&page=1`;
+        
+        console.log(`📡 Solicitando newsletters desde: ${apiUrl}`);
+        
+        // Solicitar todos los newsletters sin límite de paginación
+        const response = await fetch(apiUrl, {
         signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
@@ -894,9 +901,32 @@ export async function obtenerNewslettersBDD() {
     }
   } catch (error) {
     console.error(`❌ Error obteniendo newsletters: ${error.message}`);
-    console.log(`💡 Asegúrate de que el servidor backend esté ejecutándose en http://localhost:3000`);
-    console.log(`💡 Verifica que la base de datos tenga newsletters registrados`);
-    return [];
+    console.log(`🔄 Intentando obtener newsletters directamente de la base de datos...`);
+    
+    // Fallback: obtener newsletters directamente de la base de datos
+    try {
+      const { Pool } = await import('pg');
+      const pool = new Pool({
+        user: process.env.DB_USER,
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD,
+        port: process.env.DB_PORT,
+      });
+      
+      const client = await pool.connect();
+      const result = await client.query('SELECT * FROM "Newsletter" ORDER BY "fecha_creacion" DESC');
+      await client.release();
+      await pool.end();
+      
+      console.log(`✅ Obtenidos ${result.rows.length} newsletters directamente de la base de datos`);
+      return result.rows;
+    } catch (dbError) {
+      console.error('❌ Error también al acceder directamente a la base de datos:', dbError);
+      console.log(`💡 Asegúrate de que el servidor backend esté ejecutándose`);
+      console.log(`💡 Verifica que la base de datos tenga newsletters registrados`);
+      return [];
+    }
   }
 }
 

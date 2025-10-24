@@ -124,9 +124,9 @@ export default class TrendsRepository {
       // Comprobación adicional: evitar recrear la misma noticia (mismo link normalizado) en los últimos 10 días
       try {
         const recentSql = `
-          SELECT "id", "Link_del_Trend", "id_newsletter", "Nombre_Newsletter_Relacionado", "Fecha_Relación", "fecha_creacion"
+          SELECT "id", "Link_del_Trend", "id_newsletter", "Nombre_Newsletter_Relacionado", "Fecha_Relación"
           FROM "Trends"
-          WHERE "fecha_creacion" > NOW() - INTERVAL '10 days' OR "Fecha_Relación" > NOW() - INTERVAL '10 days'
+          WHERE "Fecha_Relación" > NOW() - INTERVAL '10 days'
         `;
         const recent = await client.query(recentSql);
         const same = recent.rows.find(r => {
@@ -269,7 +269,7 @@ export default class TrendsRepository {
     const client = new Client(DBConfig);
     try {
       await client.connect();
-      const sql = `DELETE FROM "Trends" WHERE "fecha_creacion" < NOW() - INTERVAL '${Math.max(1, Number(days))} days' RETURNING "id";`;
+      const sql = `DELETE FROM "Trends" WHERE "Fecha_Relación" < NOW() - INTERVAL '${Math.max(1, Number(days))} days' RETURNING "id";`;
       const result = await client.query(sql);
       return result.rowCount || 0;
     } catch (err) {
