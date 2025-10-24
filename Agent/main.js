@@ -1342,6 +1342,69 @@ export async function analizarNoticiaEstructurada(url) {
   };
 }
 
+// Función para verificar si una URL ya existe en la base de datos
+async function verificarDuplicadoPorURL(url) {
+  try {
+    const { Pool } = await import('pg');
+    const pool = new Pool({
+      user: process.env.DB_USER,
+      host: process.env.DB_HOST,
+      database: process.env.DB_NAME,
+      password: process.env.DB_PASSWORD,
+      port: process.env.DB_PORT,
+    });
+    
+    const client = await pool.connect();
+    
+    try {
+      // Normalizar URL para comparación
+      const normalizeLink = (url) => {
+        try {
+          const u = new URL(String(url || '').trim());
+          // Remover parámetros de tracking comunes
+          const paramsToRemove = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid'];
+          paramsToRemove.forEach(param => u.searchParams.delete(param));
+          return u.toString();
+        } catch {
+          return String(url || '').trim();
+        }
+      };
+      
+      const normalizedUrl = normalizeLink(url);
+      
+      // Buscar URLs similares en los últimos 30 días
+      const sql = `
+        SELECT "id", "Link_del_Trend"
+        FROM "Trends"
+        WHERE "Fecha_Relación" > NOW() - INTERVAL '30 days'
+        AND (
+          lower("Link_del_Trend") = lower($1) OR
+          lower("Link_del_Trend") = lower($2)
+        )
+        LIMIT 1
+      `;
+      
+      const result = await client.query(sql, [url, normalizedUrl]);
+      
+      if (result.rows.length > 0) {
+        console.log(`🔍 Duplicado encontrado para URL: ${url} (ID: ${result.rows[0].id})`);
+        return true;
+      }
+      
+      console.log(`✅ URL no duplicada: ${url}`);
+      return false;
+      
+    } finally {
+      client.release();
+      await pool.end();
+    }
+  } catch (error) {
+    console.error('Error verificando duplicado por URL:', error);
+    // En caso de error, asumir que no es duplicado para no bloquear el flujo
+    return false;
+  }
+}
+
 // Procesar un conjunto de URLs: analizar y persistir en Trends si corresponde
 export async function procesarUrlsYPersistir(items = []) {
   console.log(`🚀 INICIANDO PROCESAMIENTO DE URLS:`);
@@ -1379,7 +1442,25 @@ export async function procesarUrlsYPersistir(items = []) {
     console.log(`🔗 URL: ${url}`);
 
     try {
-      // Nota: no saltamos la URL completa por feedback; solo controlamos a nivel relación más abajo
+      // PRIMERO: Verificar si la URL ya existe en la base de datos (duplicado)
+      console.log(`🔍 Verificando si la URL ya existe en la base de datos...`);
+      const isDuplicate = await verificarDuplicadoPorURL(url);
+      
+      if (isDuplicate) {
+        console.log(`⛔ URL duplicada detectada: ${url}. Saltando análisis de IA.`);
+        resultados.push({
+          url,
+          resultado: null,
+          insertado: false,
+          trendsCreados: 0,
+          duplicado: true
+        });
+        continue;
+      }
+      
+      console.log(`✅ URL no duplicada. Procediendo con análisis de IA...`);
+      
+      // SEGUNDO: Analizar noticia con IA
       console.log(`🔍 Analizando noticia: ${url}`);
       const resultado = await analizarNoticiaEstructurada(url);
       
