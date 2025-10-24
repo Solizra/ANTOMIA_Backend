@@ -240,7 +240,7 @@ export default class NewsletterRepository {
     const client = new Client(DBConfig);
     try {
       await client.connect();
-      const sql = 'SELECT id, link, "Resumen", titulo, "fecha_creacion" FROM "Newsletter" WHERE id = $1 LIMIT 1';
+      const sql = 'SELECT id, link, "Resumen", titulo FROM "Newsletter" WHERE id = $1 LIMIT 1';
       const result = await client.query(sql, [id]);
       return result.rows[0] || null;
     } catch (err) {
