@@ -2,10 +2,8 @@ name: Actualizar relaciones de noticias
 
 on:
   schedule:
-    
     - cron: "*/30 * * * *" # 🕒 Cada 30 minutos
-    # - cron: "0 3 * * *" # 💤 Una vez al día a las 3 AM UTC (descomentar esta línea si querés volver al modo diario)
-
+    # - cron: "0 3 * * *"  # 💤 Una vez al día a las 3 AM UTC (descomentar esta línea si querés volver al modo diario)
   workflow_dispatch:       # permite ejecutarlo manualmente desde GitHub
 
 jobs:
@@ -24,7 +22,7 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
-       - name: Crear archivo .env con las variables
+      - name: Crear archivo .env con las variables
         run: |
           echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
           echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> .env
