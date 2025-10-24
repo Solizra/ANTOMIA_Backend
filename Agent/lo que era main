@@ -6,6 +6,7 @@ import readline from 'readline';
 import { fileURLToPath } from 'url';
 import TrendsService from '../Services/Trends-services.js';
 import eventBus from '../EventBus.js';
+import { apiURL } from '../constants.js';
 
 // Configuración
 const DEBUG = false;
@@ -398,7 +399,7 @@ export async function obtenerNewslettersBDD() {
     console.log(`📥 Obteniendo newsletters de la base de datos (obtenerNewslettersBDD)...`);
     
     // Solicitar todos los newsletters sin límite de paginación
-    const response = await fetch('http://localhost:3000/api/Newsletter?limit=10000&page=1');
+    const response = await fetch(`${apiURL}/api/Newsletter?limit=10000&page=1`);
     if (!response.ok) {
       throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
     }

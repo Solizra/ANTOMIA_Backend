@@ -7,6 +7,7 @@ import urllib.error
 import urllib.parse
 import xml.etree.ElementTree as ET
 from typing import List, Tuple, Optional
+import {apiURL} from "../constants"
 
 
 # --------------------------- Utilidades de entorno ---------------------------
@@ -131,7 +132,7 @@ def parse_feed_entries(xml_bytes: bytes) -> List[Tuple[str, str]]:
 
 
 # ---------------------------- Resumen con el Agente --------------------------
-def generar_resumen_via_agente(url_o_texto: str, base_url: str = "http://localhost:3000") -> str:
+def generar_resumen_via_agente(url_o_texto: str, base_url: str = `${apiURL}`) -> str:
     """Pide resumen al backend (usa generarResumenIA internamente)."""
     try:
         # Construcción del endpoint
@@ -218,7 +219,7 @@ def main() -> int:
     db_conf = get_db_config()
 
     feed_url = "https://pulsobyantom.substack.com/feed"
-    backend_base_url = os.environ.get("BACKEND_BASE_URL", "http://localhost:3000")
+    backend_base_url = os.environ.get("BACKEND_BASE_URL", "https://antomia-backend.onrender.com")
     test_mode = ("--test" in sys.argv) or (os.environ.get("SUBSTACK_TEST") == "1")
 
     # Validación estricta del feed

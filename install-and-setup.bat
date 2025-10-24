@@ -105,11 +105,11 @@ echo.
 echo Ahora puedes:
 echo 1. Verificar que el archivo .env tenga la contraseña correcta
 echo 2. Ejecutar: npm start
-echo 3. Abrir: http://localhost:3000/api/Trends
+echo 3. Abrir: https://antomia-backend.onrender.com/api/Trends
 echo.
 echo Para probar la conexion:
-echo GET http://localhost:3000/api/Newsletter
-echo GET http://localhost:3000/api/Trends
-echo GET http://localhost:3000/api/Fuentes
+echo GET https://antomia-backend.onrender.com/api/Newsletter
+echo GET https://antomia-backend.onrender.com/api/Trends
+echo GET https://antomia-backend.onrender.com/api/Fuentes
 echo.
 pause

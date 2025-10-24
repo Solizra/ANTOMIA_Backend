@@ -1,11 +1,12 @@
 // Script de diagnóstico para verificar el estado de la base de datos
 import fetch from 'node-fetch';
+import { apiURL } from '../constants';
 
 async function diagnosticarBD() {
   
   try {
     // 1. Verificar si el servidor está ejecutándose
-    const response = await fetch('http://localhost:3000/api/Newsletter?limit=1&page=1', {
+    const response = await fetch(`${apiURL}/api/Newsletter?limit=1&page=1`, {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
@@ -37,7 +38,7 @@ async function diagnosticarBD() {
       console.log('📄 Contenido de la respuesta:', data);
     }
     
-    const response2 = await fetch('http://localhost:3000/api/Newsletter?limit=10000&page=1', {
+    const response2 = await fetch(`${apiURL}/api/Newsletter?limit=10000&page=1`, {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'

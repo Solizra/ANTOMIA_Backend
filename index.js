@@ -12,6 +12,7 @@ import { analizarNoticiaEstructurada } from './Agent/main.js';
 import { iniciarProgramacionAutomatica } from './APIs/buscarNoticias.mjs';
 import { importSubstackFeed, scheduleSubstackImport } from './APIs/importSubstack.mjs';
 import eventBus from './EventBus.js';
+import { apiURL } from './constants.js';
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -24,10 +25,10 @@ app.use(cors());
 app.use(express.json());
 
 // Definición de rutas principales (cada una con su controlador y servicio detrás)
-app.use('/api/Newsletter', NewsletterRouter); // http://localhost:3000/api/Newsletter
-app.use('/api/Trends', TrendsRouter); // http://localhost:3000/api/Trends
-app.use('/api/Fuentes', FuentesRouter); // http://localhost:3000/api/Fuentes
-app.use('/api/Feedback', FeedbackRouter); // http://localhost:3000/api/Feedback
+app.use('/api/Newsletter', NewsletterRouter); // `${apiURL}/api/Newsletter`
+app.use('/api/Trends', TrendsRouter); // `${apiURL}/api/Trends`
+app.use('/api/Fuentes', FuentesRouter); // `${apiURL}/api/Fuentes`
+app.use('/api/Feedback', FeedbackRouter); // `${apiURL}/api/Feedback`
 
 // Endpoint para obtener las últimas URLs de noticias guardadas por el scheduler
 app.get('/api/news/latest', (req, res) => {
