@@ -2,8 +2,8 @@ name: Actualizar relaciones de noticias
 
 on:
   schedule:
-    - cron: "*/30 * * * *" # 🕒 Cada 30 minutos
-    # - cron: "0 3 * * *"  # 💤 Una vez al día a las 3 AM UTC (descomentar para modo diario)
+    # cron: "*/30 * * * *" # 🕒 Cada 30 minutos
+    - cron: "0 3 * * *"  # 💤 Una vez al día a las 3 AM UTC (descomentar para modo diario)
   workflow_dispatch:       # permite ejecutarlo manualmente desde GitHub
 
 jobs:
