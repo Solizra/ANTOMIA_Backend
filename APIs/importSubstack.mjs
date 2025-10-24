@@ -22,7 +22,6 @@ export async function importSubstackFeed() {
     const xml = await res.text();
     const $ = cheerio.load(xml, { xmlMode: true });
 
-    // RSS items
     const items = $('channel > item');
     const entries = [];
     if (items && items.length) {
@@ -32,7 +31,6 @@ export async function importSubstackFeed() {
         if (title && link) entries.push({ title, link });
       });
     } else {
-      // Atom fallback
       $('feed > entry').each((_, el) => {
         const title = $(el).find('title').first().text().trim();
         const linkEl = $(el).find('link[rel="alternate"]').first();
@@ -44,41 +42,24 @@ export async function importSubstackFeed() {
     total = entries.length;
     for (const { title, link } of entries) {
       try {
-        // Dominio permitido
         const u = new URL(link);
-        if (u.hostname.toLowerCase() !== 'pulsobyantom.substack.com') {
-          continue;
-        }
-        // Resumir rápido
+        if (u.hostname.toLowerCase() !== 'pulsobyantom.substack.com') continue;
+
         const { titulo: t2, resumen } = await resumirDesdeUrl(link);
         const tituloFinal = title || t2 || '';
         const created = await svc.createOrIgnoreAsync({ link, Resumen: resumen || '', titulo: tituloFinal });
-        if (created?.duplicated) {
-          duplicados += 1;
-        } else {
-          nuevos += 1;
-        }
+        if (created?.duplicated) duplicados += 1;
+        else nuevos += 1;
       } catch (e) {
-        // continuar con el siguiente
+        console.error('Error procesando link:', link, e);
       }
     }
   } catch (e) {
-    throw e;
+    console.error('Error general importando feed:', e);
+    throw e; // esto hará que el workflow marque failure
   }
 
   return { total, nuevos, duplicados };
-}
-
-let substackTimer = null;
-export function scheduleSubstackImport() {
-  // Cada 14 días
-  const intervalMs = 14 * 24 * 60 * 60 * 1000;
-  if (substackTimer) clearInterval(substackTimer);
-  substackTimer = setInterval(async () => {
-    try {
-      await importSubstackFeed();
-    } catch {}
-  }, intervalMs);
 }
 
 // Función para ejecutar desde línea de comandos
@@ -94,8 +75,7 @@ async function ejecutarImportSubstack() {
   }
 }
 
-// Si se ejecuta directamente este archivo, ejecutar la importación
+// Ejecutar solo si se corre directamente desde Node
 if (process.argv[1] && process.argv[1].includes('importSubstack.mjs')) {
   ejecutarImportSubstack();
 }
-
