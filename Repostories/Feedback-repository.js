@@ -73,10 +73,10 @@ export default class FeedbackRepository {
         SELECT 1
         FROM "Feedback"
         WHERE "trendData" IS NOT NULL
-          AND lower(COALESCE(("trendData"->>'trendLink')::text, '')) = lower($1)
+          AND lower(COALESCE(("trendData"::jsonb->>'trendLink')::text, '')) = lower($1)
           AND lower(COALESCE("feedback", '')) = 'negative'
           AND (
-            $2::text IS NULL OR COALESCE(("trendData"->>'newsletterId')::text, 'null') = $2
+            $2::text IS NULL OR COALESCE(("trendData"::jsonb->>'newsletterId')::text, 'null') = $2
           )
         LIMIT 1;
       `;

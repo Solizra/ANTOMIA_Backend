@@ -234,4 +234,20 @@ export default class NewsletterRepository {
       await client.end();
     }
   };
+
+  // Obtener newsletter por ID
+  getByIdAsync = async (id) => {
+    const client = new Client(DBConfig);
+    try {
+      await client.connect();
+      const sql = 'SELECT id, link, "Resumen", titulo, "fecha_creacion" FROM "Newsletter" WHERE id = $1 LIMIT 1';
+      const result = await client.query(sql, [id]);
+      return result.rows[0] || null;
+    } catch (err) {
+      console.error('Error obteniendo newsletter por ID:', err);
+      throw err;
+    } finally {
+      await client.end();
+    }
+  };
 }

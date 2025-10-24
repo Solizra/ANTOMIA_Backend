@@ -95,4 +95,15 @@ export default class NewsletterService {
       throw error;
     }
   };
+
+  // Obtener newsletter por ID
+  getByIdAsync = async (id) => {
+    try {
+      const repo = new NewsletterRepostory();
+      return await repo.getByIdAsync(id);
+    } catch (error) {
+      console.error('Error en NewsletterService.getByIdAsync:', error);
+      throw error;
+    }
+  };
 }

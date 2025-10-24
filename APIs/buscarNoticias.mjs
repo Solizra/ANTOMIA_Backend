@@ -404,17 +404,6 @@ function iniciarProgramacionAutomatica() {
     buscarNoticias();
   }, 10000);
   
-  // Programar ejecución cada 30 minutos (búsqueda de noticias)
-  const cronExpression = '*/30 * * * *'; // Cada 30 minutos
-  
-  // Nota: evitamos especificar timezone para mayor compatibilidad en Windows
-  // y entornos sin ICU completo. Para expresiones por minuto no es necesario.
-  cron.schedule(cronExpression, () => {
-    buscarNoticias(); // refresca solo las URLs para el agente/front
-  }, {
-    scheduled: true
-  });
-  
   // Programar limpieza UNA VEZ AL DÍA a las 03:00 AM
   cron.schedule('0 3 * * *', () => {
     try {
@@ -427,7 +416,7 @@ function iniciarProgramacionAutomatica() {
     }
   }, { scheduled: true });
   
-  console.log(`⏰ Búsqueda programada cada 30 minutos y limpieza diaria 03:00`);
+  console.log(`⏰ Búsqueda automática deshabilitada (manejada por GitHub Actions). Limpieza diaria 03:00`);
 }
 
 // Función para ejecutar una sola vez (comportamiento original)

@@ -20,6 +20,25 @@ router.get('', async (req, res) => {
   }
 });
 
+// Endpoint para obtener un newsletter por ID
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const newsletter = await svc.getByIdAsync(id);
+    if (!newsletter) {
+      return res.status(404).json({ error: 'Newsletter no encontrado' });
+    }
+    res.status(200).json(newsletter);
+  } catch (e) {
+    console.error('❌ Error en Newsletter-controller.getById:', e);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      details: e.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 router.put('/:id/resumen', async (req, res) => {
   try {
     const { id } = req.params;
