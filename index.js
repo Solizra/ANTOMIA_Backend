@@ -8,6 +8,7 @@ import NewsletterRouter from './Controllers/Newsletter-controller.js'
 import TrendsRouter from './Controllers/Trends-controller.js'
 import FuentesRouter from './Controllers/Fuentes-controller.js'
 import FeedbackRouter from './Controllers/Feedback-controller.js'
+import AuthRouter from './Controllers/Auth-controller-simple.js'
 import { analizarNoticiaEstructurada } from './Agent/main.js';
 import { iniciarProgramacionAutomatica } from './APIs/buscarNoticias.mjs';
 import { importSubstackFeed } from './APIs/importSubstack.mjs';
@@ -29,6 +30,7 @@ app.use('/api/Newsletter', NewsletterRouter); // `${apiURL}/api/Newsletter`
 app.use('/api/Trends', TrendsRouter); // `${apiURL}/api/Trends`
 app.use('/api/Fuentes', FuentesRouter); // `${apiURL}/api/Fuentes`
 app.use('/api/Feedback', FeedbackRouter); // `${apiURL}/api/Feedback`
+app.use('/api/auth', AuthRouter); // `${apiURL}/api/auth`
 
 // Endpoint para obtener las últimas URLs de noticias guardadas por el scheduler
 app.get('/api/news/latest', (req, res) => {
@@ -158,6 +160,7 @@ app.post('/api/newsletters/import-substack-now', async (req, res) => {
     const result = await importSubstackFeed();
     res.json({ success: true, ...result });
   } catch (error) {
+    console.error('Error en import substack:', error);
     res.status(500).json({ success: false, error: error?.message || 'Error' });
   }
 });
@@ -175,6 +178,8 @@ app.listen(port, async () => {
     });
     
     // Import de Substack ahora se maneja via GitHub Actions cada 14 días
+    // Comentado temporalmente para evitar errores al iniciar
+    // importSubstackFeed().catch(console.error);
   } catch (e) {
     console.error('Error iniciando la búsqueda de noticias:', e);
   }
