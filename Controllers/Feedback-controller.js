@@ -5,7 +5,7 @@ import eventBus from '../EventBus.js';
 const router = Router();
 const svc = new FeedbackService();
 
-router.post('', async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const payload = req.body || {};
     

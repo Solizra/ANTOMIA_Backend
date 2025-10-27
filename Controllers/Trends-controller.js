@@ -5,7 +5,7 @@ import eventBus from '../EventBus.js';
 const router = Router();
 const svc = new TrendsService();
 
-router.post('', async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     // Coaccionar tipos básicos por seguridad
     const b = req.body || {};
@@ -37,7 +37,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.get('', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const data = await svc.listAsync(req.query);
     res.status(200).json(data);

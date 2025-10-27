@@ -6,7 +6,7 @@ const svc = new FuentesService();
 
 // GET /api/Fuentes
 // Lista todas las fuentes disponibles (mapeadas a { fuente, categoria, activo })
-router.get('', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const rows = await svc.listAsync();
     res.status(200).json(rows);
@@ -18,7 +18,7 @@ router.get('', async (req, res) => {
 
 // POST /api/Fuentes
 // Agrega una fuente si no existe. Si ya existe, devuelve un mensaje indicándolo
-router.post('', async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { dominio, fuente, categoria } = req.body || {};
     const valor = typeof fuente === 'string' && fuente ? fuente : dominio;
@@ -44,7 +44,7 @@ router.post('', async (req, res) => {
 
 // DELETE /api/Fuentes?dominio=example.com
 // Elimina la fuente cuyo valor coincida (case-insensitive)
-router.delete('', async (req, res) => {
+router.delete('/', async (req, res) => {
   try {
     const { dominio, fuente } = req.query || {};
     const valor = typeof fuente === 'string' && fuente ? fuente : dominio;

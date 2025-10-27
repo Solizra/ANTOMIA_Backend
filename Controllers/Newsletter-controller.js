@@ -5,7 +5,7 @@ import TrendsService from '../Services/Trends-services.js';
 const router = Router();
 const svc = new NewsletterService();
 
-router.get('', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const data = await svc.getAllAsync(req.query);
     console.log(`📧 Newsletters obtenidos: ${data.length}`);
@@ -73,7 +73,7 @@ router.put('/resumen', async (req, res) => {
   }
 });
 
-router.post('', async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { link } = req.body || {};
     if (!link || typeof link !== 'string') {
@@ -131,7 +131,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.delete('', async (req, res) => {
+router.delete('/', async (req, res) => {
   try {
     const { id, link } = req.query || {};
     if (!id && !link) return res.status(400).json({ error: 'Parámetro "id" o "link" requerido' });
