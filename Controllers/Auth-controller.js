@@ -185,6 +185,86 @@ router.get('/health', async (req, res) => {
   }
 });
 
+// POST /api/auth/verify-supervisor - Verificar existencia de supervisor
+router.post('/verify-supervisor', validateRequestData(['supervisorEmail']), async (req, res) => {
+  try {
+    const { supervisorEmail } = req.body;
+    
+    const result = await authService.verifySupervisorExists(supervisorEmail);
+    
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(res, error, 'Error verificando supervisor');
+  }
+});
+
+// POST /api/auth/register-with-supervisor - Registrar usuario con validación de supervisor
+router.post('/register-with-supervisor', validateRequestData(['email', 'password', 'confirmPassword', 'supervisorEmail']), async (req, res) => {
+  try {
+    const { email, password, confirmPassword, nombre, apellido, supervisorEmail } = req.body;
+    
+    const result = await authService.registerUserWithSupervisor(
+      { email, password, confirmPassword, nombre, apellido },
+      supervisorEmail
+    );
+    
+    res.status(201).json(result);
+  } catch (error) {
+    handleError(res, error, 'Error registrando usuario con supervisor');
+  }
+});
+
+// GET /api/auth/users - Listar todos los usuarios
+router.get('/users', async (req, res) => {
+  try {
+    const result = await authService.listAllUsers();
+    
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(res, error, 'Error listando usuarios');
+  }
+});
+
+// POST /api/auth/users/:userId/deactivate - Desactivar usuario
+router.post('/users/:userId/deactivate', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'ID de usuario inválido'
+      });
+    }
+    
+    const result = await authService.deactivateUser(userId);
+    
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(res, error, 'Error desactivando usuario');
+  }
+});
+
+// POST /api/auth/users/:userId/activate - Activar usuario
+router.post('/users/:userId/activate', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'ID de usuario inválido'
+      });
+    }
+    
+    const result = await authService.activateUser(userId);
+    
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(res, error, 'Error activando usuario');
+  }
+});
+
 // Middleware de manejo de rutas no encontradas
 router.use('*', (req, res) => {
   res.status(404).json({
@@ -199,7 +279,12 @@ router.use('*', (req, res) => {
       'POST /api/auth/change-password',
       'POST /api/auth/cleanup-tokens',
       'POST /api/auth/validate-password',
-      'GET /api/auth/health'
+      'GET /api/auth/health',
+      'POST /api/auth/verify-supervisor',
+      'POST /api/auth/register-with-supervisor',
+      'GET /api/auth/users',
+      'POST /api/auth/users/:userId/activate',
+      'POST /api/auth/users/:userId/deactivate'
     ]
   });
 });

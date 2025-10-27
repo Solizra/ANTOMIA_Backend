@@ -283,6 +283,150 @@ class AuthService {
     }
   }
 
+  // Verificar existencia de supervisor
+  async verifySupervisorExists(supervisorEmail) {
+    try {
+      if (!this.validateEmail(supervisorEmail)) {
+        throw new Error('Formato de email del supervisor inválido');
+      }
+
+      const supervisor = await this.authRepository.checkSupervisorExists(supervisorEmail);
+      
+      if (!supervisor) {
+        throw new Error('El supervisor especificado no existe en la base de datos');
+      }
+
+      return {
+        success: true,
+        supervisor: {
+          id: supervisor.id,
+          email: supervisor.email,
+          nombre: supervisor.nombre,
+          apellido: supervisor.apellido
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error en verifySupervisorExists:', error);
+      throw error;
+    }
+  }
+
+  // Registrar usuario con validación de supervisor
+  async registerUserWithSupervisor(userData, supervisorEmail) {
+    try {
+      const { email, password, confirmPassword, nombre, apellido } = userData;
+
+      // Validar supervisor primero
+      await this.verifySupervisorExists(supervisorEmail);
+
+      // Validar email
+      if (!this.validateEmail(email)) {
+        throw new Error('Formato de email inválido');
+      }
+
+      // Validar contraseñas
+      if (password !== confirmPassword) {
+        throw new Error('Las contraseñas no coinciden');
+      }
+
+      const passwordValidation = this.validatePassword(password);
+      if (!passwordValidation.isValid) {
+        throw new Error(`Contraseña inválida: ${passwordValidation.errors.join(', ')}`);
+      }
+
+      // Verificar si el email ya existe
+      const emailExists = await this.authRepository.emailExists(email);
+      if (emailExists) {
+        throw new Error('El email ya está registrado');
+      }
+
+      // Hashear contraseña
+      const hashedPassword = await this.hashPassword(password);
+
+      // Crear usuario
+      const newUser = await this.authRepository.createUser({
+        email,
+        password: hashedPassword,
+        nombre,
+        apellido
+      });
+
+      console.log(`✅ Usuario registrado con supervisor: ${email}`);
+
+      return {
+        success: true,
+        message: 'Usuario registrado exitosamente con contraseña segura',
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          nombre: newUser.nombre,
+          apellido: newUser.apellido
+        },
+        supervisorVerified: true
+      };
+
+    } catch (error) {
+      console.error('❌ Error en registerUserWithSupervisor:', error);
+      throw error;
+    }
+  }
+
+  // Listar todos los usuarios
+  async listAllUsers() {
+    try {
+      const users = await this.authRepository.listAllUsers();
+      
+      return {
+        success: true,
+        users: users.map(user => ({
+          id: user.id,
+          email: user.email,
+          nombre: user.nombre,
+          apellido: user.apellido,
+          activo: user.activo,
+          email_verificado: user.email_verificado,
+          fecha_creacion: user.fecha_creacion
+        })),
+        total: users.length
+      };
+    } catch (error) {
+      console.error('❌ Error en listAllUsers:', error);
+      throw error;
+    }
+  }
+
+  // Desactivar usuario
+  async deactivateUser(userId) {
+    try {
+      const user = await this.authRepository.deactivateUser(userId);
+      
+      return {
+        success: true,
+        message: 'Usuario desactivado exitosamente',
+        user
+      };
+    } catch (error) {
+      console.error('❌ Error en deactivateUser:', error);
+      throw error;
+    }
+  }
+
+  // Activar usuario
+  async activateUser(userId) {
+    try {
+      const user = await this.authRepository.activateUser(userId);
+      
+      return {
+        success: true,
+        message: 'Usuario activado exitosamente',
+        user
+      };
+    } catch (error) {
+      console.error('❌ Error en activateUser:', error);
+      throw error;
+    }
+  }
+
   // Registrar nuevo usuario
   async registerUser(userData) {
     try {

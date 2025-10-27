@@ -8,7 +8,7 @@ import NewsletterRouter from './Controllers/Newsletter-controller.js'
 import TrendsRouter from './Controllers/Trends-controller.js'
 import FuentesRouter from './Controllers/Fuentes-controller.js'
 import FeedbackRouter from './Controllers/Feedback-controller.js'
-import AuthRouter from './Controllers/Auth-controller-simple.js'
+import AuthRouter from './Controllers/Auth-controller.js'
 import { analizarNoticiaEstructurada } from './Agent/main.js';
 import { iniciarProgramacionAutomatica } from './APIs/buscarNoticias.mjs';
 import { importSubstackFeed } from './APIs/importSubstack.mjs';

@@ -163,6 +163,76 @@ class AuthRepository {
     }
   }
 
+  // Buscar usuario por ID sin filtrar por activo
+  async findUserByIdAnyStatus(userId) {
+    try {
+      const query = 'SELECT * FROM "Users" WHERE id = $1';
+      const result = await this.pool.query(query, [userId]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error en findUserByIdAnyStatus:', error);
+      throw error;
+    }
+  }
+
+  // Verificar si existe un usuario supervisor
+  async checkSupervisorExists(supervisorEmail) {
+    try {
+      const query = 'SELECT id, email, nombre, apellido FROM "Users" WHERE email = $1 AND activo = true';
+      const result = await this.pool.query(query, [supervisorEmail]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error en checkSupervisorExists:', error);
+      throw error;
+    }
+  }
+
+  // Listar todos los usuarios (para administración)
+  async listAllUsers() {
+    try {
+      const query = 'SELECT id, email, nombre, apellido, activo, email_verificado, fecha_creacion FROM "Users" ORDER BY fecha_creacion DESC';
+      const result = await this.pool.query(query);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en listAllUsers:', error);
+      throw error;
+    }
+  }
+
+  // Desactivar usuario
+  async deactivateUser(userId) {
+    try {
+      const query = `
+        UPDATE "Users" 
+        SET activo = false, fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING id, email, nombre, apellido
+      `;
+      const result = await this.pool.query(query, [userId]);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error en deactivateUser:', error);
+      throw error;
+    }
+  }
+
+  // Activar usuario
+  async activateUser(userId) {
+    try {
+      const query = `
+        UPDATE "Users" 
+        SET activo = true, fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING id, email, nombre, apellido
+      `;
+      const result = await this.pool.query(query, [userId]);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error en activateUser:', error);
+      throw error;
+    }
+  }
+
   // Cerrar conexión
   async close() {
     await this.pool.end();
