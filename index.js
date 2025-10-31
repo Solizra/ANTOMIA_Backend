@@ -33,7 +33,7 @@ app.use('/api/Feedback', FeedbackRouter); // `${apiURL}/api/Feedback`
 app.use('/api/auth', AuthRouter); // `${apiURL}/api/auth`
 
 // Endpoint para disparar manualmente el workflow de GitHub Actions `auto-update.yml`
-app.post('/api/admin/run-auto-update', async (req, res) => {
+async function triggerAutoUpdateWorkflow(req, res) {
   try {
     const adminToken = req.headers['x-admin-token'];
     if (!process.env.ADMIN_API_TOKEN) {
@@ -78,7 +78,11 @@ app.post('/api/admin/run-auto-update', async (req, res) => {
     console.error('Error al disparar auto-update:', error);
     return res.status(500).json({ success: false, error: error?.message || 'Error interno' });
   }
-});
+}
+
+// Rutas compatibles para el disparo del workflow
+app.post('/api/admin/run-auto-update', triggerAutoUpdateWorkflow);
+app.post('/api/github/trigger-backend', triggerAutoUpdateWorkflow);
 
 // Endpoint para obtener las últimas URLs de noticias guardadas por el scheduler
 app.get('/api/news/latest', (req, res) => {
