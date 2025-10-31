@@ -225,6 +225,47 @@ router.get('/users', async (req, res) => {
   }
 });
 
+// POST /api/auth/users - Crear usuario (admin)
+router.post('/users', validateRequestData(['email', 'password']), async (req, res) => {
+  try {
+    const { email, password, nombre, apellido, activo, email_verificado } = req.body;
+    const result = await authService.createUserAdmin({ email, password, nombre, apellido, activo, email_verificado });
+    res.status(201).json(result);
+  } catch (error) {
+    handleError(res, error, 'Error creando usuario');
+  }
+});
+
+// PUT /api/auth/users/:userId - Actualizar usuario (admin)
+router.put('/users/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ success: false, error: 'ID de usuario inválido' });
+    }
+    const allowed = ['email', 'password', 'nombre', 'apellido', 'activo', 'email_verificado'];
+    const updates = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
+    const result = await authService.updateUserAdmin(userId, updates);
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(res, error, 'Error actualizando usuario');
+  }
+});
+
+// DELETE /api/auth/users/:userId - Eliminar usuario (admin)
+router.delete('/users/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ success: false, error: 'ID de usuario inválido' });
+    }
+    const result = await authService.deleteUserAdmin(userId);
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(res, error, 'Error eliminando usuario');
+  }
+});
+
 // POST /api/auth/users/:userId/deactivate - Desactivar usuario
 router.post('/users/:userId/deactivate', async (req, res) => {
   try {
@@ -283,6 +324,9 @@ router.use('*', (req, res) => {
       'POST /api/auth/verify-supervisor',
       'POST /api/auth/register-with-supervisor',
       'GET /api/auth/users',
+      'POST /api/auth/users',
+      'PUT /api/auth/users/:userId',
+      'DELETE /api/auth/users/:userId',
       'POST /api/auth/users/:userId/activate',
       'POST /api/auth/users/:userId/deactivate'
     ]

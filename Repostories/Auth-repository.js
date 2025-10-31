@@ -36,6 +36,50 @@ class AuthRepository {
     }
   }
 
+  // Actualizar campos de un usuario (admin)
+  async updateUser(userId, updates) {
+    try {
+      const allowedFields = ['email', 'password', 'nombre', 'apellido', 'activo', 'email_verificado'];
+      const entries = Object.entries(updates).filter(([key]) => allowedFields.includes(key));
+      if (entries.length === 0) {
+        throw new Error('No hay campos válidos para actualizar');
+      }
+
+      const setFragments = entries.map(([key], index) => `${key} = $${index + 1}`);
+      const values = entries.map(([, value]) => value);
+      values.push(userId);
+
+      const query = `
+        UPDATE "Users"
+        SET ${setFragments.join(', ')}, fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE id = $${values.length}
+        RETURNING id, email, nombre, apellido, activo, email_verificado, fecha_creacion
+      `;
+
+      const result = await this.pool.query(query, values);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error en updateUser:', error);
+      throw error;
+    }
+  }
+
+  // Eliminar usuario definitivamente (admin)
+  async deleteUser(userId) {
+    try {
+      const query = `
+        DELETE FROM "Users"
+        WHERE id = $1
+        RETURNING id, email
+      `;
+      const result = await this.pool.query(query, [userId]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error en deleteUser:', error);
+      throw error;
+    }
+  }
+
   // Actualizar contraseña del usuario
   async updateUserPassword(userId, newPassword) {
     try {

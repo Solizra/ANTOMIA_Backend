@@ -483,6 +483,125 @@ class AuthService {
     }
   }
 
+  // Crear usuario (admin)
+  async createUserAdmin(userData) {
+    try {
+      const { email, password, nombre, apellido, activo, email_verificado } = userData;
+
+      if (!this.validateEmail(email)) {
+        throw new Error('Formato de email inválido');
+      }
+
+      if (!password) {
+        throw new Error('La contraseña es requerida');
+      }
+
+      const passwordValidation = this.validatePassword(password);
+      if (!passwordValidation.isValid) {
+        throw new Error(`Contraseña inválida: ${passwordValidation.errors.join(', ')}`);
+      }
+
+      const emailExists = await this.authRepository.emailExists(email);
+      if (emailExists) {
+        throw new Error('El email ya está registrado');
+      }
+
+      const hashedPassword = await this.hashPassword(password);
+
+      const newUser = await this.authRepository.createUser({
+        email,
+        password: hashedPassword,
+        nombre,
+        apellido
+      });
+
+      // Si llegan flags admin, actualizar
+      const flagsToUpdate = {};
+      if (typeof activo === 'boolean') flagsToUpdate.activo = activo;
+      if (typeof email_verificado === 'boolean') flagsToUpdate.email_verificado = email_verificado;
+      let finalUser = newUser;
+      if (Object.keys(flagsToUpdate).length > 0) {
+        finalUser = await this.authRepository.updateUser(newUser.id, flagsToUpdate);
+      }
+
+      return {
+        success: true,
+        message: 'Usuario creado por admin exitosamente',
+        user: {
+          id: finalUser.id,
+          email: finalUser.email,
+          nombre: finalUser.nombre,
+          apellido: finalUser.apellido,
+          activo: finalUser.activo,
+          email_verificado: finalUser.email_verificado
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error en createUserAdmin:', error);
+      throw error;
+    }
+  }
+
+  // Actualizar usuario (admin)
+  async updateUserAdmin(userId, updates) {
+    try {
+      const user = await this.authRepository.findUserByIdAnyStatus(userId);
+      if (!user) {
+        throw new Error('Usuario no encontrado');
+      }
+
+      const toUpdate = { ...updates };
+      if (toUpdate.email) {
+        if (!this.validateEmail(toUpdate.email)) {
+          throw new Error('Formato de email inválido');
+        }
+      }
+      if (toUpdate.password) {
+        const passwordValidation = this.validatePassword(toUpdate.password);
+        if (!passwordValidation.isValid) {
+          throw new Error(`Contraseña inválida: ${passwordValidation.errors.join(', ')}`);
+        }
+        toUpdate.password = await this.hashPassword(toUpdate.password);
+      }
+
+      const updatedUser = await this.authRepository.updateUser(userId, toUpdate);
+      if (!updatedUser) {
+        throw new Error('No fue posible actualizar el usuario');
+      }
+
+      return {
+        success: true,
+        message: 'Usuario actualizado exitosamente',
+        user: updatedUser
+      };
+    } catch (error) {
+      console.error('❌ Error en updateUserAdmin:', error);
+      throw error;
+    }
+  }
+
+  // Eliminar usuario (admin)
+  async deleteUserAdmin(userId) {
+    try {
+      const user = await this.authRepository.findUserByIdAnyStatus(userId);
+      if (!user) {
+        throw new Error('Usuario no encontrado');
+      }
+      const deleted = await this.authRepository.deleteUser(userId);
+      if (!deleted) {
+        throw new Error('No fue posible eliminar el usuario');
+      }
+      return {
+        success: true,
+        message: 'Usuario eliminado definitivamente',
+        user: deleted
+      };
+    } catch (error) {
+      console.error('❌ Error en deleteUserAdmin:', error);
+      throw error;
+    }
+  }
+
   // Autenticar usuario
   async authenticateUser(email, password) {
     try {
