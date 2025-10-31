@@ -33,6 +33,23 @@ jobs:
           echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
           echo "API_URL=${{secrets.API_URL}}" >> .env
 
+      - name: Esperar a que el backend esté disponible
+        run: |
+          echo "⏳ Esperando que el backend se levante..."
+          for i in {1..30}; do
+            STATUS=$(curl -s https://antomia-backend.onrender.com/api/health | grep -o '"status":"ok"')
+            if [ "$STATUS" = '"status":"ok"' ]; then
+              echo "✅ Backend disponible."
+              break
+            fi
+            echo "❌ Backend no disponible (intento $i/30). Reintentando en 10 segundos..."
+            sleep 10
+          done
+          if [ "$STATUS" != '"status":"ok"' ]; then
+            echo "❌ No se pudo conectar con el backend después de varios intentos. Abortando ejecución."
+            exit 1
+          fi
+
       - name: Ejecutar script de la API de noticias
         run: |
           echo "🚀 Iniciando búsqueda de noticias..."
