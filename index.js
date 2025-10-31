@@ -89,6 +89,61 @@ app.delete('/api/users/:userId', async (req, res) => {
   }
 });
 
+// DELETE por email (sin :userId)
+app.delete('/api/users', async (req, res) => {
+  try {
+    const email = req.query.email || req.body?.email;
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
+    }
+    const result = await authService.deleteUserByEmailAdmin(String(email));
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error en DELETE /api/users (por email):', error);
+    const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
+    res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+  }
+});
+
+// Alias adicionales que apuntan a los mismos handlers: /api/Users, /api/usuarios, /api/usuarios_registrados
+const usersAliases = ['/api/Users', '/api/usuarios', '/api/usuarios_registrados'];
+for (const base of usersAliases) {
+  app.get(base, async (req, res) => {
+    try {
+      const result = await authService.listAllUsers();
+      res.status(200).json(result);
+    } catch (error) {
+      console.error(`Error en GET ${base}:`, error);
+      res.status(500).json({ success: false, error: error?.message || 'Error interno' });
+    }
+  });
+  app.post(base, async (req, res) => {
+    try {
+      const { email, password, nombre, apellido, activo, email_verificado } = req.body || {};
+      const result = await authService.createUserAdmin({ email, password, nombre, apellido, activo, email_verificado });
+      res.status(201).json(result);
+    } catch (error) {
+      console.error(`Error en POST ${base}:`, error);
+      const status = (error?.message && (error.message.includes('inválido') || error.message.includes('registrado') || error.message.includes('coinciden'))) ? 400 : 500;
+      res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+    }
+  });
+  app.delete(base, async (req, res) => {
+    try {
+      const email = req.query.email || req.body?.email;
+      if (!email) {
+        return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
+      }
+      const result = await authService.deleteUserByEmailAdmin(String(email));
+      res.status(200).json(result);
+    } catch (error) {
+      console.error(`Error en DELETE ${base}:`, error);
+      const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
+      res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+    }
+  });
+}
+
 // Endpoint para disparar manualmente el workflow de GitHub Actions `auto-update.yml`
 async function triggerAutoUpdateWorkflow(req, res) {
   try {

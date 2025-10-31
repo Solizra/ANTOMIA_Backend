@@ -80,6 +80,22 @@ class AuthRepository {
     }
   }
 
+  // Eliminar usuario por email (admin)
+  async deleteUserByEmail(email) {
+    try {
+      const query = `
+        DELETE FROM "Users"
+        WHERE email = $1
+        RETURNING id, email
+      `;
+      const result = await this.pool.query(query, [email]);
+      return result.rows[0] || null;
+    } catch (error) {
+      console.error('Error en deleteUserByEmail:', error);
+      throw error;
+    }
+  }
+
   // Actualizar contraseña del usuario
   async updateUserPassword(userId, newPassword) {
     try {

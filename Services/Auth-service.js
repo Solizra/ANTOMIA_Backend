@@ -602,6 +602,31 @@ class AuthService {
     }
   }
 
+  // Eliminar usuario por email (admin)
+  async deleteUserByEmailAdmin(email) {
+    try {
+      if (!this.validateEmail(email)) {
+        throw new Error('Formato de email inválido');
+      }
+      const exists = await this.authRepository.emailExists(email);
+      if (!exists) {
+        throw new Error('Usuario no encontrado');
+      }
+      const deleted = await this.authRepository.deleteUserByEmail(email);
+      if (!deleted) {
+        throw new Error('No fue posible eliminar el usuario');
+      }
+      return {
+        success: true,
+        message: 'Usuario eliminado definitivamente por email',
+        user: deleted
+      };
+    } catch (error) {
+      console.error('❌ Error en deleteUserByEmailAdmin:', error);
+      throw error;
+    }
+  }
+
   // Autenticar usuario
   async authenticateUser(email, password) {
     try {
