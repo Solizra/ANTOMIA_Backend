@@ -9,6 +9,7 @@ import TrendsRouter from './Controllers/Trends-controller.js'
 import FuentesRouter from './Controllers/Fuentes-controller.js'
 import FeedbackRouter from './Controllers/Feedback-controller.js'
 import AuthRouter from './Controllers/Auth-controller.js'
+import AuthService from './Services/Auth-service.js'
 import { analizarNoticiaEstructurada } from './Agent/main.js';
 import { iniciarProgramacionAutomatica } from './APIs/buscarNoticias.mjs';
 import { importSubstackFeed } from './APIs/importSubstack.mjs';
@@ -16,6 +17,7 @@ import eventBus from './EventBus.js';
 import { apiURL } from './constants.js';
 const app = express();
 const port = process.env.PORT || 3000;
+const authService = new AuthService();
 
 // Ruta absoluta al archivo de URLs de noticias
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +33,61 @@ app.use('/api/Trends', TrendsRouter); // `${apiURL}/api/Trends`
 app.use('/api/Fuentes', FuentesRouter); // `${apiURL}/api/Fuentes`
 app.use('/api/Feedback', FeedbackRouter); // `${apiURL}/api/Feedback`
 app.use('/api/auth', AuthRouter); // `${apiURL}/api/auth`
+
+// Alias de endpoints de usuarios para compatibilidad con frontend: /api/users
+app.get('/api/users', async (req, res) => {
+  try {
+    const result = await authService.listAllUsers();
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error en GET /api/users:', error);
+    res.status(500).json({ success: false, error: error?.message || 'Error interno' });
+  }
+});
+
+app.post('/api/users', async (req, res) => {
+  try {
+    const { email, password, nombre, apellido, activo, email_verificado } = req.body || {};
+    const result = await authService.createUserAdmin({ email, password, nombre, apellido, activo, email_verificado });
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('Error en POST /api/users:', error);
+    const status = (error?.message && (error.message.includes('inválido') || error.message.includes('registrado') || error.message.includes('coinciden'))) ? 400 : 500;
+    res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+  }
+});
+
+app.put('/api/users/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ success: false, error: 'ID de usuario inválido' });
+    }
+    const allowed = ['email', 'password', 'nombre', 'apellido', 'activo', 'email_verificado'];
+    const updates = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
+    const result = await authService.updateUserAdmin(userId, updates);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error en PUT /api/users/:userId:', error);
+    const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
+    res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+  }
+});
+
+app.delete('/api/users/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ success: false, error: 'ID de usuario inválido' });
+    }
+    const result = await authService.deleteUserAdmin(userId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error en DELETE /api/users/:userId:', error);
+    const status = (error?.message && error.message.includes('no encontrado')) ? 400 : 500;
+    res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+  }
+});
 
 // Endpoint para disparar manualmente el workflow de GitHub Actions `auto-update.yml`
 async function triggerAutoUpdateWorkflow(req, res) {
