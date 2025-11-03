@@ -8,26 +8,34 @@ class EmailService {
 
   initializeTransporter() {
     try {
+      const emailDisabled = String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true';
+      const host = process.env.EMAIL_HOST || '';
+      const user = process.env.EMAIL_USER || '';
+      const pass = process.env.EMAIL_PASSWORD || '';
+
+      if (emailDisabled || !host || !user || !pass) {
+        this.transporter = null;
+        const reason = emailDisabled ? 'EMAIL_DISABLED habilitado' : 'Variables EMAIL_HOST/USER/PASSWORD no configuradas';
+        console.warn(`⚠️ Email deshabilitado: ${reason}. El sistema continuará sin enviar correos.`);
+        return;
+      }
+
       this.transporter = nodemailer.createTransport({
-        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+        host: host,
         port: parseInt(process.env.EMAIL_PORT) || 587,
-        secure: false, // true para 465, false para otros puertos
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD
-        },
-        tls: {
-          rejectUnauthorized: false
-        }
+        secure: false,
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 10000,
+        greetingTimeout: 8000,
+        socketTimeout: 15000
       });
 
-      // Verificar la configuración del transporter
-      this.transporter.verify((error, success) => {
-        if (error) {
-          console.error('❌ Error configurando email service:', error);
-        } else {
-          console.log('✅ Email service configurado correctamente');
-        }
+      // Verificación opcional y no bloqueante
+      this.transporter.verify().then(() => {
+        console.log('✅ Email service configurado correctamente');
+      }).catch((error) => {
+        console.error('❌ Error configurando email service (no bloqueante):', error?.code || error?.message || error);
       });
     } catch (error) {
       console.error('❌ Error inicializando email service:', error);
@@ -37,9 +45,8 @@ class EmailService {
   // Enviar email de recuperación de contraseña
   async sendPasswordResetEmail(email, resetToken, userName = 'Usuario') {
     try {
-      if (!this.transporter) {
-        throw new Error('Email service no está configurado correctamente');
-      }
+      // Envío de emails deshabilitado por requerimiento: no se envía correo
+      return { skipped: true };
 
       const resetUrl = `${process.env.FRONTEND_URL}/change-password?token=${resetToken}`;
       
@@ -63,9 +70,8 @@ class EmailService {
   // Enviar email de confirmación de cambio de contraseña
   async sendPasswordChangeConfirmationEmail(email, userName = 'Usuario') {
     try {
-      if (!this.transporter) {
-        throw new Error('Email service no está configurado correctamente');
-      }
+      // Envío de emails deshabilitado por requerimiento: no se envía correo
+      return { skipped: true };
 
       const mailOptions = {
         from: `"ANTOMIA" <${process.env.EMAIL_FROM}>`,

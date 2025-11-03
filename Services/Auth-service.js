@@ -599,6 +599,17 @@ class AuthService {
         }
       };
     } catch (error) {
+      // Errores comunes de PostgreSQL para claridad
+      if (error && error.code === '42P01') {
+        // undefined_table
+        error.message = 'La tabla UsuariosAgregados no existe. Crea la tabla antes de usar este endpoint.';
+      } else if (error && error.code === '23505') {
+        // unique_violation (probablemente email duplicado)
+        error.message = error.message || 'El email ya está registrado';
+      } else if (error && error.code === '23503') {
+        // foreign_key_violation
+        error.message = 'Referencia inválida al crear el enlace en UsuariosAgregados (FK).';
+      }
       console.error('❌ Error en createUserForOwner:', error);
       throw error;
     }
