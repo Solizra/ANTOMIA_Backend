@@ -44,6 +44,21 @@ const requireAuth = (req, res, next) => {
   }
 };
 
+// Middleware: permitir añadir usuarios solo a emails en whitelist
+const requireAdderWhitelist = (req, res, next) => {
+  const allowed = new Set([
+    'solizraa@gmail.com',
+    'sassonindiana@gmail.com',
+    '48460067@est.ort.edu.ar',
+    'paula@antom.la'
+  ]);
+  const email = (req.user?.email || '').toLowerCase();
+  if (!allowed.has(email)) {
+    return res.status(403).json({ success: false, error: 'No tienes permiso para añadir usuarios' });
+  }
+  next();
+};
+
 // Definición de rutas principales (cada una con su controlador y servicio detrás)
 app.use('/api/Newsletter', NewsletterRouter); // `${apiURL}/api/Newsletter`
 app.use('/api/Trends', TrendsRouter); // `${apiURL}/api/Trends`
@@ -62,11 +77,11 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-app.post('/api/users', requireAuth, async (req, res) => {
+app.post('/api/users', requireAuth, requireAdderWhitelist, async (req, res) => {
   try {
-    const { email, password, nombre, apellido, activo, email_verificado } = req.body || {};
+    const { email, password, confirmPassword, nombre, apellido, activo, email_verificado } = req.body || {};
     const ownerUserId = req.user?.userId;
-    const result = await authService.createUserForOwner({ email, password, nombre, apellido, activo, email_verificado }, ownerUserId);
+    const result = await authService.createUserForOwner({ email, password, confirmPassword, nombre, apellido, activo, email_verificado }, ownerUserId);
     res.status(201).json(result);
   } catch (error) {
     console.error('Error en POST /api/users:', error);
@@ -147,11 +162,11 @@ for (const base of usersAliases) {
       res.status(500).json({ success: false, error: error?.message || 'Error interno' });
     }
   });
-  app.post(base, requireAuth, async (req, res) => {
+  app.post(base, requireAuth, requireAdderWhitelist, async (req, res) => {
     try {
-      const { email, password, nombre, apellido, activo, email_verificado } = req.body || {};
+      const { email, password, confirmPassword, nombre, apellido, activo, email_verificado } = req.body || {};
       const ownerUserId = req.user?.userId;
-      const result = await authService.createUserForOwner({ email, password, nombre, apellido, activo, email_verificado }, ownerUserId);
+      const result = await authService.createUserForOwner({ email, password, confirmPassword, nombre, apellido, activo, email_verificado }, ownerUserId);
       res.status(201).json(result);
     } catch (error) {
       console.error(`Error en POST ${base}:`, error);

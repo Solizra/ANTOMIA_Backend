@@ -545,7 +545,7 @@ class AuthService {
   // Crear usuario para un dueño (usuario autenticado)
   async createUserForOwner(userData, ownerUserId) {
     try {
-      const { email, password, nombre, apellido, activo, email_verificado } = userData;
+      const { email, password, confirmPassword, nombre, apellido, activo, email_verificado } = userData;
 
       if (!ownerUserId) {
         throw new Error('Usuario no autenticado');
@@ -556,6 +556,9 @@ class AuthService {
       }
       if (!password) {
         throw new Error('La contraseña es requerida');
+      }
+      if (confirmPassword && password !== confirmPassword) {
+        throw new Error('Las contraseñas no coinciden');
       }
       const passwordValidation = this.validatePassword(password);
       if (!passwordValidation.isValid) {

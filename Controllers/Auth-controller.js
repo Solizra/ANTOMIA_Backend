@@ -20,6 +20,21 @@ const requireAuth = (req, res, next) => {
   }
 };
 
+// Middleware: permitir añadir usuarios solo a emails en whitelist
+const requireAdderWhitelist = (req, res, next) => {
+  const allowed = new Set([
+    'solizraa@gmail.com',
+    'sassonindiana@gmail.com',
+    '48460067@est.ort.edu.ar',
+    'paula@antom.la'
+  ]);
+  const email = (req.user?.email || '').toLowerCase();
+  if (!allowed.has(email)) {
+    return res.status(403).json({ success: false, error: 'No tienes permiso para añadir usuarios' });
+  }
+  next();
+};
+
 // Middleware para validar datos de entrada
 const validateRequestData = (requiredFields) => {
   return (req, res, next) => {
@@ -241,12 +256,12 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// POST /api/auth/users - Crear usuario (admin)
-router.post('/users', requireAuth, validateRequestData(['email', 'password']), async (req, res) => {
+// POST /api/auth/users - Crear usuario por usuario autorizado (whitelist)
+router.post('/users', requireAuth, requireAdderWhitelist, validateRequestData(['email', 'password', 'confirmPassword']), async (req, res) => {
   try {
-    const { email, password, nombre, apellido, activo, email_verificado } = req.body;
+    const { email, password, confirmPassword, nombre, apellido, activo, email_verificado } = req.body;
     const ownerUserId = req.user?.userId;
-    const result = await authService.createUserForOwner({ email, password, nombre, apellido, activo, email_verificado }, ownerUserId);
+    const result = await authService.createUserForOwner({ email, password, confirmPassword, nombre, apellido, activo, email_verificado }, ownerUserId);
     res.status(201).json(result);
   } catch (error) {
     handleError(res, error, 'Error creando usuario');
