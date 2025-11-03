@@ -64,6 +64,40 @@ class AuthRepository {
     }
   }
 
+  // Registrar relación en UsuariosAgregados
+  async insertUsuarioAgregado(usuarioAgregadoId, usuarioJefeId) {
+    try {
+      const query = `
+        INSERT INTO "UsuariosAgregados" ("UsuarioAgregado", "UsuarioJefe")
+        VALUES ($1, $2)
+        RETURNING id, "UsuarioAgregado", "UsuarioJefe"
+      `;
+      const result = await this.pool.query(query, [usuarioAgregadoId, usuarioJefeId]);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error en insertUsuarioAgregado:', error);
+      throw error;
+    }
+  }
+
+  // Listar usuarios agregados por un jefe (dueño)
+  async listUsuariosAgregadosByJefe(usuarioJefeId) {
+    try {
+      const query = `
+        SELECT u.id, u.email, u.nombre, u.apellido, u.activo, u.email_verificado, u.fecha_creacion
+        FROM "UsuariosAgregados" ua
+        JOIN "Users" u ON ua."UsuarioAgregado" = u.id
+        WHERE ua."UsuarioJefe" = $1
+        ORDER BY u.fecha_creacion DESC
+      `;
+      const result = await this.pool.query(query, [usuarioJefeId]);
+      return result.rows;
+    } catch (error) {
+      console.error('Error en listUsuariosAgregadosByJefe:', error);
+      throw error;
+    }
+  }
+
   // Eliminar usuario definitivamente (admin)
   async deleteUser(userId) {
     try {

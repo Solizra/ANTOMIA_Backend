@@ -542,6 +542,86 @@ class AuthService {
     }
   }
 
+  // Crear usuario para un dueño (usuario autenticado)
+  async createUserForOwner(userData, ownerUserId) {
+    try {
+      const { email, password, nombre, apellido, activo, email_verificado } = userData;
+
+      if (!ownerUserId) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      if (!this.validateEmail(email)) {
+        throw new Error('Formato de email inválido');
+      }
+      if (!password) {
+        throw new Error('La contraseña es requerida');
+      }
+      const passwordValidation = this.validatePassword(password);
+      if (!passwordValidation.isValid) {
+        throw new Error(`Contraseña inválida: ${passwordValidation.errors.join(', ')}`);
+      }
+      const emailExists = await this.authRepository.emailExists(email);
+      if (emailExists) {
+        throw new Error('El email ya está registrado');
+      }
+
+      const hashedPassword = await this.hashPassword(password);
+      const newUser = await this.authRepository.createUser({
+        email,
+        password: hashedPassword,
+        nombre,
+        apellido
+      });
+
+      // Flags opcionales
+      const flagsToUpdate = {};
+      if (typeof activo === 'boolean') flagsToUpdate.activo = activo;
+      if (typeof email_verificado === 'boolean') flagsToUpdate.email_verificado = email_verificado;
+      let finalUser = newUser;
+      if (Object.keys(flagsToUpdate).length > 0) {
+        finalUser = await this.authRepository.updateUser(newUser.id, flagsToUpdate);
+      }
+
+      // Registrar relación en UsuariosAgregados
+      await this.authRepository.insertUsuarioAgregado(finalUser.id, ownerUserId);
+
+      return {
+        success: true,
+        message: 'Usuario creado exitosamente para el usuario autenticado',
+        user: {
+          id: finalUser.id,
+          email: finalUser.email,
+          nombre: finalUser.nombre,
+          apellido: finalUser.apellido,
+          activo: finalUser.activo,
+          email_verificado: finalUser.email_verificado
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error en createUserForOwner:', error);
+      throw error;
+    }
+  }
+
+  // Listar usuarios por dueño (usuario autenticado)
+  async listUsersByOwner(ownerUserId) {
+    try {
+      if (!ownerUserId) {
+        throw new Error('Usuario no autenticado');
+      }
+      const users = await this.authRepository.listUsuariosAgregadosByJefe(ownerUserId);
+      return {
+        success: true,
+        users,
+        total: users.length
+      };
+    } catch (error) {
+      console.error('❌ Error en listUsersByOwner:', error);
+      throw error;
+    }
+  }
+
   // Actualizar usuario (admin)
   async updateUserAdmin(userId, updates) {
     try {

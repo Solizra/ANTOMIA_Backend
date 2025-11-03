@@ -4,6 +4,22 @@ import AuthService from '../Services/Auth-service.js';
 const router = express.Router();
 const authService = new AuthService();
 
+// Middleware de autenticación por JWT (usuarios autorizados)
+const requireAuth = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const [scheme, token] = authHeader.split(' ');
+    if (scheme !== 'Bearer' || !token) {
+      return res.status(401).json({ success: false, error: 'No autenticado' });
+    }
+    const payload = authService.verifyJWT(token);
+    req.user = { userId: payload.userId, email: payload.email };
+    next();
+  } catch (e) {
+    return res.status(401).json({ success: false, error: 'Token inválido o expirado' });
+  }
+};
+
 // Middleware para validar datos de entrada
 const validateRequestData = (requiredFields) => {
   return (req, res, next) => {
@@ -226,10 +242,11 @@ router.get('/users', async (req, res) => {
 });
 
 // POST /api/auth/users - Crear usuario (admin)
-router.post('/users', validateRequestData(['email', 'password']), async (req, res) => {
+router.post('/users', requireAuth, validateRequestData(['email', 'password']), async (req, res) => {
   try {
     const { email, password, nombre, apellido, activo, email_verificado } = req.body;
-    const result = await authService.createUserAdmin({ email, password, nombre, apellido, activo, email_verificado });
+    const ownerUserId = req.user?.userId;
+    const result = await authService.createUserForOwner({ email, password, nombre, apellido, activo, email_verificado }, ownerUserId);
     res.status(201).json(result);
   } catch (error) {
     handleError(res, error, 'Error creando usuario');
@@ -237,7 +254,7 @@ router.post('/users', validateRequestData(['email', 'password']), async (req, re
 });
 
 // PUT /api/auth/users/:userId - Actualizar usuario (admin)
-router.put('/users/:userId', async (req, res) => {
+router.put('/users/:userId', requireAuth, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     if (!userId || isNaN(userId)) {
@@ -253,7 +270,7 @@ router.put('/users/:userId', async (req, res) => {
 });
 
 // DELETE /api/auth/users/:userId - Eliminar usuario (admin)
-router.delete('/users/:userId', async (req, res) => {
+router.delete('/users/:userId', requireAuth, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     if (!userId || isNaN(userId)) {
@@ -267,7 +284,7 @@ router.delete('/users/:userId', async (req, res) => {
 });
 
 // POST /api/auth/users/:userId/deactivate - Desactivar usuario
-router.post('/users/:userId/deactivate', async (req, res) => {
+router.post('/users/:userId/deactivate', requireAuth, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     
@@ -287,7 +304,7 @@ router.post('/users/:userId/deactivate', async (req, res) => {
 });
 
 // POST /api/auth/users/:userId/activate - Activar usuario
-router.post('/users/:userId/activate', async (req, res) => {
+router.post('/users/:userId/activate', requireAuth, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     
@@ -303,6 +320,17 @@ router.post('/users/:userId/activate', async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     handleError(res, error, 'Error activando usuario');
+  }
+});
+
+// GET /api/auth/my-users - Usuarios agregados por el usuario autenticado
+router.get('/my-users', requireAuth, async (req, res) => {
+  try {
+    const ownerUserId = req.user?.userId;
+    const result = await authService.listUsersByOwner(ownerUserId);
+    res.status(200).json(result);
+  } catch (error) {
+    handleError(res, error, 'Error listando usuarios del usuario autenticado');
   }
 });
 

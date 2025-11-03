@@ -27,6 +27,22 @@ const noticiasFilePath = path.join(__dirname, 'APIs', 'noticias.json');
 app.use(cors());
 app.use(express.json());
 
+// Middleware de autenticación por JWT reutilizable (usuarios autorizados)
+const requireAuth = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const [scheme, token] = authHeader.split(' ');
+    if (scheme !== 'Bearer' || !token) {
+      return res.status(401).json({ success: false, error: 'No autenticado' });
+    }
+    const payload = authService.verifyJWT(token);
+    req.user = { userId: payload.userId, email: payload.email };
+    next();
+  } catch (e) {
+    return res.status(401).json({ success: false, error: 'Token inválido o expirado' });
+  }
+};
+
 // Definición de rutas principales (cada una con su controlador y servicio detrás)
 app.use('/api/Newsletter', NewsletterRouter); // `${apiURL}/api/Newsletter`
 app.use('/api/Trends', TrendsRouter); // `${apiURL}/api/Trends`
@@ -45,10 +61,11 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', requireAuth, async (req, res) => {
   try {
     const { email, password, nombre, apellido, activo, email_verificado } = req.body || {};
-    const result = await authService.createUserAdmin({ email, password, nombre, apellido, activo, email_verificado });
+    const ownerUserId = req.user?.userId;
+    const result = await authService.createUserForOwner({ email, password, nombre, apellido, activo, email_verificado }, ownerUserId);
     res.status(201).json(result);
   } catch (error) {
     console.error('Error en POST /api/users:', error);
@@ -57,7 +74,7 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
-app.put('/api/users/:userId', async (req, res) => {
+app.put('/api/users/:userId', requireAuth, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     if (!userId || isNaN(userId)) {
@@ -74,7 +91,7 @@ app.put('/api/users/:userId', async (req, res) => {
   }
 });
 
-app.delete('/api/users/:userId', async (req, res) => {
+app.delete('/api/users/:userId', requireAuth, async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
     if (!userId || isNaN(userId)) {
@@ -90,7 +107,7 @@ app.delete('/api/users/:userId', async (req, res) => {
 });
 
 // DELETE por email (sin :userId)
-app.delete('/api/users', async (req, res) => {
+app.delete('/api/users', requireAuth, async (req, res) => {
   try {
     const email = req.query.email || req.body?.email;
     if (!email) {
@@ -110,6 +127,18 @@ const usersAliases = ['/api/Users', '/api/usuarios', '/api/usuarios_registrados'
 for (const base of usersAliases) {
   app.get(base, async (req, res) => {
     try {
+      // Si viene autenticado, devolver solo los suyos; si no, lista completa
+      const authHeader = req.headers.authorization || '';
+      const [scheme, token] = authHeader.split(' ');
+      if (scheme === 'Bearer' && token) {
+        try {
+          const payload = authService.verifyJWT(token);
+          const result = await authService.listUsersByOwner(payload.userId);
+          return res.status(200).json(result);
+        } catch (e) {
+          // si el token es inválido, continuar a lista completa por compatibilidad
+        }
+      }
       const result = await authService.listAllUsers();
       res.status(200).json(result);
     } catch (error) {
@@ -117,10 +146,11 @@ for (const base of usersAliases) {
       res.status(500).json({ success: false, error: error?.message || 'Error interno' });
     }
   });
-  app.post(base, async (req, res) => {
+  app.post(base, requireAuth, async (req, res) => {
     try {
       const { email, password, nombre, apellido, activo, email_verificado } = req.body || {};
-      const result = await authService.createUserAdmin({ email, password, nombre, apellido, activo, email_verificado });
+      const ownerUserId = req.user?.userId;
+      const result = await authService.createUserForOwner({ email, password, nombre, apellido, activo, email_verificado }, ownerUserId);
       res.status(201).json(result);
     } catch (error) {
       console.error(`Error en POST ${base}:`, error);
@@ -128,7 +158,7 @@ for (const base of usersAliases) {
       res.status(status).json({ success: false, error: error?.message || 'Error interno' });
     }
   });
-  app.delete(base, async (req, res) => {
+  app.delete(base, requireAuth, async (req, res) => {
     try {
       const email = req.query.email || req.body?.email;
       if (!email) {
