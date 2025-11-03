@@ -306,8 +306,8 @@ router.post('/users/:userId/activate', async (req, res) => {
   }
 });
 
-// Middleware de manejo de rutas no encontradas
-router.use('*', (req, res) => {
+// Middleware de manejo de rutas no encontradas (Express 5: evitar '*')
+router.use((req, res) => {
   res.status(404).json({
     success: false,
     error: 'Endpoint no encontrado',

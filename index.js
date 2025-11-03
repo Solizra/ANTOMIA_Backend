@@ -4,6 +4,7 @@ import cors from "cors";
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import fetch from 'node-fetch';
 import NewsletterRouter from './Controllers/Newsletter-controller.js'
 import TrendsRouter from './Controllers/Trends-controller.js'
 import FuentesRouter from './Controllers/Fuentes-controller.js'
