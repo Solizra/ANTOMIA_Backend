@@ -34,7 +34,16 @@ export default class NewsletterService {
       if (!link || typeof link !== 'string') {
         throw new Error('Falta el campo "link"');
       }
-      return await repo.createAsync({ link, titulo, Resumen });
+      // Compatibilidad: en despliegues donde no exista repo.createAsync,
+      // usar createOrIgnoreAsync y adaptar la respuesta al formato esperado por el controller.
+      if (typeof repo.createAsync === 'function') {
+        return await repo.createAsync({ link, titulo, Resumen });
+      }
+      const created = await repo.createOrIgnoreAsync({ link, Resumen, titulo });
+      if (created && created.duplicated) {
+        return { duplicated: true, data: created.existing };
+      }
+      return created;
     } catch (error) {
       console.error('Error en NewsletterService.createAsync:', error);
       throw error;

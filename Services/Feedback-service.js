@@ -29,6 +29,9 @@ export default class FeedbackService {
       }
       
       console.log('🔧 FeedbackService: Datos limpios para guardar:', clean);
+      if (typeof this.repo.createAsync !== 'function') {
+        throw new Error('FeedbackRepository.createAsync no está disponible en este despliegue');
+      }
       const result = await this.repo.createAsync(clean);
       console.log('✅ FeedbackService: Feedback guardado exitosamente:', result);
       return result;

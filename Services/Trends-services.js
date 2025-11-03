@@ -83,6 +83,9 @@ export default class TrendsService {
         }
       }
       
+      if (typeof this.repo.createAsync !== 'function') {
+        throw new Error('TrendsRepository.createAsync no está disponible en este despliegue');
+      }
       return await this.repo.createAsync(payload);
     } catch (error) {
       console.error('Error en TrendsService.createAsync:', error);
