@@ -32,14 +32,15 @@ if (!envLoaded) {
 
 console.log('🔍 Variables de entorno:');
 console.log('  DB_HOST:', process.env.DB_HOST || 'NO DEFINIDO');
-console.log('  DB_DATABASE:', process.env.DB_DATABASE || 'NO DEFINIDO');
+console.log('  DB_DATABASE:', process.env.DB_DATABASE || process.env.DB_NAME || 'NO DEFINIDO');
 console.log('  DB_USER:', process.env.DB_USER || 'NO DEFINIDO');
 console.log('  DB_PASSWORD:', process.env.DB_PASSWORD ? '***DEFINIDO***' : 'NO DEFINIDO');
 console.log('  DB_PORT:', process.env.DB_PORT || 'NO DEFINIDO');
 
 const DBConfig = {
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_DATABASE || 'climatetech_db',
+  // Aceptar ambas variables para compatibilidad: DB_DATABASE (preferida) o DB_NAME (legado)
+  database: process.env.DB_DATABASE || process.env.DB_NAME || 'climatetech_db',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'tu_password',
   port: parseInt(process.env.DB_PORT) || 5432
