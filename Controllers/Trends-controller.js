@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import TrendsService from '../Services/Trends-services.js';
+import FeedbackService from '../Services/Feedback-service.js';
 import eventBus from '../EventBus.js';
 
 const router = Router();
 const svc = new TrendsService();
+const feedbackSvc = new FeedbackService();
 
 router.post('/', async (req, res) => {
   try {
@@ -57,6 +59,44 @@ router.delete('/:id', async (req, res) => {
     
     console.log(`🗑️ Iniciando eliminación de trend ID: ${id}`);
     
+    // Capturar razón y datos del trend para registrar feedback negativo
+    let reason = null;
+    try {
+      // aceptar body o query
+      const body = req.body || {};
+      reason = body.reason ?? req.query?.reason ?? null;
+    } catch {}
+
+    // Leer trend actual antes de eliminar para persistir trendData
+    let trend = null;
+    try {
+      trend = await svc.getByIdAsync(id);
+    } catch (getErr) {
+      console.warn('⚠️ No se pudo obtener trend antes de eliminar:', getErr?.message || getErr);
+    }
+
+    // Intentar guardar feedback negativo (no bloquear la eliminación si falla)
+    try {
+      const trendData = trend ? {
+        trendTitulo: trend['Título_del_Trend'] || null,
+        newsletterTitulo: trend['Nombre_Newsletter_Relacionado'] || null,
+        trendLink: trend['Link_del_Trend'] || null,
+        newsletterId: trend['id_newsletter'] ?? null
+      } : null;
+
+      await feedbackSvc.createAsync({
+        trendId: id,
+        action: 'delete',
+        reason: reason || 'other',
+        feedback: 'negative',
+        trendData,
+        timestamp: new Date().toISOString()
+      });
+      console.log('📝 Feedback negativo registrado para trend eliminado:', { id, reason: reason || 'other' });
+    } catch (fbErr) {
+      console.warn('⚠️ No se pudo registrar feedback negativo en eliminación:', fbErr?.message || fbErr);
+    }
+
     // Intentar borrar (idempotente)
     let deleted = false;
     try {
