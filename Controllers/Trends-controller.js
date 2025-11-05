@@ -85,10 +85,10 @@ router.delete('/:id', async (req, res) => {
       } : null;
 
       await feedbackSvc.createAsync({
-        trendId: id,
+        trendId: null, // evitar cascada al borrar Trend
         action: 'delete',
         reason: reason || 'other',
-        feedback: 'negative',
+        feedback: 'negativo',
         trendData,
         timestamp: new Date().toISOString()
       });
