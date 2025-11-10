@@ -265,13 +265,38 @@ router.post('/analizar', async (req, res) => {
 // Endpoint para forzar una noticia como climatech (cuando la IA dijo que no lo era)
 router.post('/forzarClimatech', async (req, res) => {
   try {
-    const { url, razonIA } = req.body || {};
-    if (!url || typeof url !== 'string') {
-      return res.status(400).json({ error: 'Falta el campo "url" (URL de la noticia) en el body.' });
+    // Aceptar múltiples alias para la URL: url, link, trendLink, querystring o body texto plano
+    let rawUrl = null;
+    try {
+      if (req.body && typeof req.body === 'object') {
+        rawUrl = req.body.url || req.body.link || req.body.trendLink || req.body?.resultado?.url || null;
+      }
+      if (!rawUrl && req.query) {
+        rawUrl = req.query.url || req.query.link || req.query.trendLink || null;
+      }
+      // Si el body vino como string (text/plain o urlencoded atípico)
+      if (!rawUrl && req.body && typeof req.body === 'string') {
+        const txt = req.body.trim();
+        // Intentar JSON
+        try { const parsed = JSON.parse(txt); rawUrl = parsed?.url || parsed?.link || parsed?.trendLink || null; } catch {}
+        // Intentar urlencoded
+        if (!rawUrl) {
+          try { const p = new URLSearchParams(txt); rawUrl = p.get('url') || p.get('link') || p.get('trendLink'); } catch {}
+        }
+        // Si parece URL, usarla directo
+        if (!rawUrl && /^(https?:\/\/)?([\w-]+\.)+[\w-]{2,}(\/[^\s]*)?$/i.test(txt)) rawUrl = txt;
+      }
+    } catch {}
+
+    const razonIA = (req.body && typeof req.body === 'object') ? req.body.razonIA : undefined;
+
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      console.warn('⚠️ /forzarClimatech sin url válida. Body recibido (keys):', req.body && typeof req.body === 'object' ? Object.keys(req.body) : typeof req.body);
+      return res.status(400).json({ error: 'Falta el campo "url" (URL de la noticia) en el body o query.' });
     }
 
     // Normalizar URL
-    const trimmed = url.trim();
+    const trimmed = rawUrl.trim();
     let urlForAnalyze = trimmed;
     const looksLikeUrl = /^(https?:\/\/)?([\w-]+\.)+[\w-]{2,}(\/[^\s]*)?$/i.test(trimmed);
     if (looksLikeUrl && !/^https?:\/\//i.test(trimmed)) {
@@ -285,7 +310,7 @@ router.post('/forzarClimatech', async (req, res) => {
       return res.status(400).json({ error: 'El campo "url" no es una URL válida.' });
     }
 
-    console.log(`🔧 [FORZAR CLIMATECH] Procesando noticia forzada como climatech: ${urlForAnalyze}`);
+    console.log(`🔧 [FORZAR CLIMATECH] Procesando noticia forzada como climatech: ${urlForAnalyze}`, { razonIA: razonIA || null });
 
     // Extraer contenido de la noticia
     const extraido = await extraerContenidoNoticia(urlForAnalyze);
