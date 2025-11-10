@@ -26,7 +26,8 @@ const requireAdderWhitelist = (req, res, next) => {
     'solizraa@gmail.com',
     'sassonindiana@gmail.com',
     '48460067@est.ort.edu.ar',
-    'paula@antom.la'
+    'paula@antom.la',
+    'ruben@antom.la'
   ]);
   const email = (req.user?.email || '').toLowerCase();
   if (!allowed.has(email)) {

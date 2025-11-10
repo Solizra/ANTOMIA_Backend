@@ -123,7 +123,7 @@ app.delete('/api/users/:userId', requireAuth, async (req, res) => {
 });
 
 // DELETE por email (sin :userId)
-app.delete('/api/users', requireAuth, async (req, res) => {
+app.delete('/api/users', async (req, res) => {
   try {
     const email = req.query.email || req.body?.email;
     if (!email) {
@@ -174,7 +174,7 @@ for (const base of usersAliases) {
       res.status(status).json({ success: false, error: error?.message || 'Error interno' });
     }
   });
-  app.delete(base, requireAuth, async (req, res) => {
+  app.delete(base, async (req, res) => {
     try {
       const email = req.query.email || req.body?.email;
       if (!email) {
