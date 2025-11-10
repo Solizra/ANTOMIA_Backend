@@ -34,6 +34,17 @@ function extractEmail(req) {
   // 1) Querystring
   if (req.query?.email) return String(req.query.email);
 
+  // 1b) Path param tipo /users/:email
+  if (req.params?.email) {
+    try {
+      const decoded = decodeURIComponent(String(req.params.email));
+      if (decoded.includes('@')) return decoded;
+      return String(req.params.email);
+    } catch {
+      return String(req.params.email);
+    }
+  }
+
   // 2) Header explícito
   if (req.headers && req.headers['x-user-email']) return String(req.headers['x-user-email']);
 
@@ -171,6 +182,22 @@ app.delete('/api/users', async (req, res) => {
   }
 });
 
+// DELETE por email en path param
+app.delete('/api/users/:email', async (req, res) => {
+  try {
+    const email = extractEmail(req);
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
+    }
+    const result = await authService.deleteUserByEmailAdmin(String(email));
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error en DELETE /api/users/:email:', error);
+    const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
+    res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+  }
+});
+
 // POST alternativo para borrar por email (compatibilidad con clientes que no envían DELETE correctamente)
 app.post('/api/users/delete', async (req, res) => {
   try {
@@ -237,8 +264,87 @@ for (const base of usersAliases) {
       res.status(status).json({ success: false, error: error?.message || 'Error interno' });
     }
   });
+  // DELETE con path param /:email
+  app.delete(`${base}/:email`, async (req, res) => {
+    try {
+      const email = extractEmail(req);
+      if (!email) {
+        return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
+      }
+      const result = await authService.deleteUserByEmailAdmin(String(email));
+      res.status(200).json(result);
+    } catch (error) {
+      console.error(`Error en DELETE ${base}/:email:`, error);
+      const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
+      res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+    }
+  });
+  // POST alternativo de compatibilidad ${base}/delete
+  app.post(`${base}/delete`, async (req, res) => {
+    try {
+      const email = extractEmail(req);
+      if (!email) {
+        return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
+      }
+      const result = await authService.deleteUserByEmailAdmin(String(email));
+      res.status(200).json(result);
+    } catch (error) {
+      console.error(`Error en POST ${base}/delete:`, error);
+      const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
+      res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+    }
+  });
 }
 
+// Rutas de compatibilidad bajo /api/admin/users
+const adminUsersAliases = ['/api/admin/users', '/api/admin/Users'];
+for (const adminBase of adminUsersAliases) {
+  // DELETE con email en query/body/header
+  app.delete(adminBase, async (req, res) => {
+    try {
+      const email = extractEmail(req);
+      if (!email) {
+        return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
+      }
+      const result = await authService.deleteUserByEmailAdmin(String(email));
+      res.status(200).json(result);
+    } catch (error) {
+      console.error(`Error en DELETE ${adminBase}:`, error);
+      const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
+      res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+    }
+  });
+  // DELETE con email en path param
+  app.delete(`${adminBase}/:email`, async (req, res) => {
+    try {
+      const email = extractEmail(req);
+      if (!email) {
+        return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
+      }
+      const result = await authService.deleteUserByEmailAdmin(String(email));
+      res.status(200).json(result);
+    } catch (error) {
+      console.error(`Error en DELETE ${adminBase}/:email:`, error);
+      const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
+      res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+    }
+  });
+  // POST alternativo adminBase/delete
+  app.post(`${adminBase}/delete`, async (req, res) => {
+    try {
+      const email = extractEmail(req);
+      if (!email) {
+        return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
+      }
+      const result = await authService.deleteUserByEmailAdmin(String(email));
+      res.status(200).json(result);
+    } catch (error) {
+      console.error(`Error en POST ${adminBase}/delete:`, error);
+      const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
+      res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+    }
+  });
+}
 // Endpoint para disparar manualmente el workflow de GitHub Actions `auto-update.yml`
 async function triggerAutoUpdateWorkflow(req, res) {
   try {
