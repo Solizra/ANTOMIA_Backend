@@ -27,6 +27,39 @@ const noticiasFilePath = path.join(__dirname, 'APIs', 'noticias.json');
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Helper robusto para extraer email desde query, headers o body en distintos formatos
+function extractEmail(req) {
+  // 1) Querystring
+  if (req.query?.email) return String(req.query.email);
+
+  // 2) Header explícito
+  if (req.headers && req.headers['x-user-email']) return String(req.headers['x-user-email']);
+
+  // 3) Body ya parseado (JSON o urlencoded)
+  if (req.body && typeof req.body === 'object' && req.body.email) return String(req.body.email);
+
+  // 4) Body como string (algunos clientes mandan DELETE con body texto)
+  if (req.body && typeof req.body === 'string') {
+    const raw = req.body.trim();
+    // Intentar JSON
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.email) return String(parsed.email);
+    } catch {}
+    // Intentar urlencoded (email=...)
+    try {
+      const params = new URLSearchParams(raw);
+      const v = params.get('email');
+      if (v) return String(v);
+    } catch {}
+    // Si es un texto simple que parece un email, usarlo
+    if (raw.includes('@') && raw.includes('.')) return raw;
+  }
+
+  return null;
+}
 
 // Middleware de autenticación por JWT reutilizable (usuarios autorizados)
 const requireAuth = (req, res, next) => {
@@ -122,10 +155,10 @@ app.delete('/api/users/:userId', requireAuth, async (req, res) => {
   }
 });
 
-// DELETE por email (sin :userId)
+// DELETE por email (sin :userId) - acepta email en query, body o header
 app.delete('/api/users', async (req, res) => {
   try {
-    const email = req.query.email || req.body?.email;
+    const email = extractEmail(req);
     if (!email) {
       return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
     }
@@ -133,6 +166,22 @@ app.delete('/api/users', async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error('Error en DELETE /api/users (por email):', error);
+    const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
+    res.status(status).json({ success: false, error: error?.message || 'Error interno' });
+  }
+});
+
+// POST alternativo para borrar por email (compatibilidad con clientes que no envían DELETE correctamente)
+app.post('/api/users/delete', async (req, res) => {
+  try {
+    const email = extractEmail(req);
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
+    }
+    const result = await authService.deleteUserByEmailAdmin(String(email));
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error en POST /api/users/delete:', error);
     const status = (error?.message && (error.message.includes('inválido') || error.message.includes('no encontrado'))) ? 400 : 500;
     res.status(status).json({ success: false, error: error?.message || 'Error interno' });
   }
@@ -176,7 +225,7 @@ for (const base of usersAliases) {
   });
   app.delete(base, async (req, res) => {
     try {
-      const email = req.query.email || req.body?.email;
+      const email = extractEmail(req);
       if (!email) {
         return res.status(400).json({ success: false, error: 'Email requerido para eliminar' });
       }
