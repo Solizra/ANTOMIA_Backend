@@ -2,7 +2,6 @@ import { Router } from 'express';
 import NewsletterService from '../Services/Newsletter-services.js';
 import { analizarNoticiaEstructurada, resumirDesdeUrl } from '../Agent/main.js';
 import TrendsService from '../Services/Trends-services.js';
-import eventBus from '../EventBus.js';
 const router = Router();
 const svc = new NewsletterService();
 
@@ -180,73 +179,10 @@ router.post('/analizar', async (req, res) => {
     // Guardado en BDD:
     // - Si esClimatech y link válido y hay relacionados -> guardar cada relación
     // - Si esClimatech y link válido y NO hay relacionados -> guardar una fila con Relacionado=false
-    // - Si NO esClimatech y link válido Y es ingresado manualmente -> guardar con marca especial [NO_CLIMATECH_MANUAL]
     const trendsSvc = new TrendsService();
     const inserts = [];
     const tieneLinkValido = resultado.url && /^https?:\/\//i.test(resultado.url);
-    
-    // NUEVO: Si NO es climatech pero fue ingresado manualmente, guardarlo igual
-    if (!resultado.esClimatech && tieneLinkValido) {
-      console.log(`📦 Guardando trend NO climatech ingresado manualmente`);
-      const razonNoClimatech = resultado.razonClimatech || 'No clasificado como climatech';
-      const payload = {
-        id_newsletter: null,
-        Título_del_Trend: resultado.titulo || '',
-        Link_del_Trend: resultado.url || '',
-        Nombre_Newsletter_Relacionado: '',
-        Fecha_Relación: new Date().toISOString(),
-        Relacionado: false,
-        // Marca especial para identificar trends no climatech manuales
-        Analisis_relacion: `[NO_CLIMATECH_MANUAL] ${razonNoClimatech}`,
-      };
-      console.log('📝 Insert payload (NO climatech manual):', payload);
-      try {
-        const created = await trendsSvc.createAsync(payload);
-        if (!created?.duplicated) {
-          inserts.push({
-            id: created?.id,
-            id_newsletter: created?.id_newsletter ?? payload.id_newsletter,
-            Título_del_Trend: created?.['Título_del_Trend'] ?? payload.Título_del_Trend,
-            Link_del_Trend: created?.['Link_del_Trend'] ?? payload.Link_del_Trend,
-            Nombre_Newsletter_Relacionado: created?.['Nombre_Newsletter_Relacionado'] ?? payload.Nombre_Newsletter_Relacionado,
-            Fecha_Relación: created?.['Fecha_Relación'] ?? payload.Fecha_Relación,
-            Relacionado: created?.['Relacionado'] ?? payload.Relacionado,
-            Analisis_relacion: created?.['Analisis_relacion'] ?? payload.Analisis_relacion,
-            newsletterLink: '',
-            esClimatech: false, // Flag para identificar que NO es climatech
-            esManual: true // Flag para identificar que fue ingresado manualmente
-          });
-          console.log('✅ Trend NO climatech manual guardado exitosamente');
-          
-          // Notificar al EventBus para actualizar el frontend en tiempo real
-          try {
-            const trendData = {
-              id: created?.id,
-              newsletterTitulo: '',
-              newsletterId: '',
-              fechaRelacion: new Date().toISOString(),
-              trendTitulo: resultado.titulo || '',
-              trendLink: resultado.url || '',
-              relacionado: false,
-              newsletterLink: '',
-              analisisRelacion: razonNoClimatech,
-              resumenFama: resultado.resumen || '',
-              autor: resultado.autor || '',
-              esClimatech: false,
-              esManual: true
-            };
-            eventBus.notifyNewTrend(trendData);
-            console.log(`📡 Nuevo trend NO climatech manual notificado: ${trendData.trendTitulo}`);
-          } catch (eventError) {
-            console.error('Error notificando trend NO climatech manual:', eventError);
-          }
-        } else {
-          console.log('⛔ Trend NO climatech duplicado evitado');
-        }
-      } catch (error) {
-        console.error('❌ Error guardando trend NO climatech manual:', error);
-      }
-    } else if (resultado.esClimatech && tieneLinkValido && Array.isArray(resultado.newslettersRelacionados) && resultado.newslettersRelacionados.length > 0) {
+    if (resultado.esClimatech && tieneLinkValido && Array.isArray(resultado.newslettersRelacionados) && resultado.newslettersRelacionados.length > 0) {
       console.log(`📦 Preparando inserciones de relaciones (${resultado.newslettersRelacionados.length})`);
       for (const nl of resultado.newslettersRelacionados) {
         const payload = {
@@ -271,9 +207,7 @@ router.post('/analizar', async (req, res) => {
             Fecha_Relación: created?.['Fecha_Relación'] ?? payload.Fecha_Relación,
             Relacionado: created?.['Relacionado'] ?? payload.Relacionado,
             Analisis_relacion: created?.['Analisis_relacion'] ?? payload.Analisis_relacion,
-            newsletterLink: nl.link || '',
-            esClimatech: true,
-            esManual: true
+            newsletterLink: nl.link || ''
           });
         } else {
           console.log('⛔ Relación duplicada evitada (controller):', payload.Link_del_Trend, payload.id_newsletter, payload.Nombre_Newsletter_Relacionado);
@@ -300,9 +234,7 @@ router.post('/analizar', async (req, res) => {
         Fecha_Relación: created?.['Fecha_Relación'] ?? payload.Fecha_Relación,
         Relacionado: created?.['Relacionado'] ?? payload.Relacionado,
         Analisis_relacion: created?.['Analisis_relacion'] ?? payload.Analisis_relacion,
-        newsletterLink: '',
-        esClimatech: true,
-        esManual: true
+        newsletterLink: ''
       });
     }
 

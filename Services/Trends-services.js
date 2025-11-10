@@ -94,48 +94,12 @@ export default class TrendsService {
   }
 
   async getByIdAsync(id) {
-    const trend = await this.repo.getByIdAsync(id);
-    if (!trend) return null;
-    // Enriquecer el trend con información sobre si es no climatech manual
-    return this.enrichTrendData(trend);
+    return await this.repo.getByIdAsync(id);
   }
 
   async listAsync(query = {}) {
     const { page = 1, limit = 20 } = query;
-    const trends = await this.repo.listAsync({ page, limit });
-    // Procesar trends para identificar los no climatech manuales y extraer información
-    return trends.map(trend => this.enrichTrendData(trend));
-  }
-
-  // Función helper para enriquecer datos del trend con información sobre si es no climatech manual
-  enrichTrendData(trend) {
-    if (!trend) {
-      return trend;
-    }
-
-    const analisis = trend.Analisis_relacion || '';
-    // Verificar si es un trend no climatech manual (tiene el prefijo especial)
-    if (analisis.startsWith('[NO_CLIMATECH_MANUAL]')) {
-      // Extraer el razonamiento (remover el prefijo)
-      const razonNoClimatech = analisis.replace(/^\[NO_CLIMATECH_MANUAL\]\s*/, '').trim();
-      return {
-        ...trend,
-        esClimatech: false,
-        esManual: true,
-        razonNoClimatech: razonNoClimatech || 'No clasificado como climatech',
-        // Mantener el Analisis_relacion original para compatibilidad
-        Analisis_relacion: analisis
-      };
-    }
-
-    // Si no tiene el prefijo, asumir que es climatech (puede tener o no newsletter relacionado)
-    // Los trends climatech sin newsletter tienen Analisis_relacion sin el prefijo especial
-    return {
-      ...trend,
-      esClimatech: true,
-      esManual: false,
-      razonNoClimatech: null
-    };
+    return await this.repo.listAsync({ page, limit });
   }
 
   async deleteAsync(id) {
