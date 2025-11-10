@@ -26,7 +26,6 @@ const query = `(
 
 
 const sortBy = 'relevancy';
-const language = 'es';
 // Palabras clave para filtrar temática - ampliadas para climatech, medio ambiente y startups
 const TOPIC_KEYWORDS = [
   // Términos trending en climatech
