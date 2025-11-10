@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import NewsletterService from '../Services/Newsletter-services.js';
-import { analizarNoticiaEstructurada, resumirDesdeUrl } from '../Agent/main.js';
+import { analizarNoticiaEstructurada, resumirDesdeUrl, extraerContenidoNoticia, generarResumenIA, obtenerNewslettersBDD, compararConNewslettersLocal } from '../Agent/main.js';
 import TrendsService from '../Services/Trends-services.js';
+import FeedbackService from '../Services/Feedback-service.js';
+import eventBus from '../EventBus.js';
 const router = Router();
 const svc = new NewsletterService();
 
@@ -249,6 +251,230 @@ router.post('/analizar', async (req, res) => {
     });
   } catch (e) {
     console.error('Error en /api/Newsletter/analizar:', e);
+    const msg = String(e?.message || '').toLowerCase();
+    if (msg.includes('403') || msg.includes('forbidden') || msg.includes('429')) {
+      return res.status(502).json({ error: 'La fuente bloqueó la extracción (403/429). Intenta otra URL o más tarde.' });
+    }
+    if (msg.includes('no se pudo extraer contenido')) {
+      return res.status(422).json({ error: 'No se pudo extraer contenido útil de la página.' });
+    }
+    res.status(500).json({ error: e?.message || 'Error interno.' });
+  }
+});
+
+// Endpoint para forzar una noticia como climatech (cuando la IA dijo que no lo era)
+router.post('/forzarClimatech', async (req, res) => {
+  try {
+    const { url, razonIA } = req.body || {};
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'Falta el campo "url" (URL de la noticia) en el body.' });
+    }
+
+    // Normalizar URL
+    const trimmed = url.trim();
+    let urlForAnalyze = trimmed;
+    const looksLikeUrl = /^(https?:\/\/)?([\w-]+\.)+[\w-]{2,}(\/[^\s]*)?$/i.test(trimmed);
+    if (looksLikeUrl && !/^https?:\/\//i.test(trimmed)) {
+      urlForAnalyze = `https://${trimmed}`;
+    }
+
+    // Validar URL final
+    try { 
+      new URL(urlForAnalyze); 
+    } catch {
+      return res.status(400).json({ error: 'El campo "url" no es una URL válida.' });
+    }
+
+    console.log(`🔧 [FORZAR CLIMATECH] Procesando noticia forzada como climatech: ${urlForAnalyze}`);
+
+    // Extraer contenido de la noticia
+    const extraido = await extraerContenidoNoticia(urlForAnalyze);
+    if (!extraido) {
+      return res.status(422).json({ error: 'No se pudo extraer contenido de la URL.' });
+    }
+
+    const textoNoticia = extraido.contenido || '';
+    console.log(`📝 Título extraído: ${extraido.titulo || 'Sin título'}`);
+    console.log(`📄 Contenido extraído: ${textoNoticia.length} caracteres`);
+
+    // Generar resumen con IA (sin clasificar si es climatech)
+    console.log(`\n🤖 GENERANDO RESUMEN CON IA...`);
+    const resumen = await generarResumenIA(textoNoticia);
+    console.log(`✅ Resumen generado: ${typeof resumen === 'string' ? resumen.substring(0, 100) + '...' : 'No disponible'}`);
+
+    // Obtener newsletters de la BD y buscar relaciones (como si fuera climatech)
+    console.log(`\n📊 OBTENIENDO NEWSLETTERS DE LA BASE DE DATOS...`);
+    const newsletters = await obtenerNewslettersBDD();
+
+    // Comparar con newsletters (forzando como climatech)
+    console.log(`\n🔍 BUSCANDO NEWSLETTERS RELACIONADOS (FORZADO COMO CLIMATECH)...`);
+    const { relacionados, motivoSinRelacion } = Array.isArray(newsletters)
+      ? await compararConNewslettersLocal(typeof resumen === 'string' ? resumen : textoNoticia, newsletters, urlForAnalyze)
+      : { relacionados: [], motivoSinRelacion: 'No hay newsletters para comparar.' };
+
+    console.log(`\n✅ BÚSQUEDA COMPLETADA`);
+    console.log(`📊 Newsletters relacionados encontrados: ${relacionados.length}`);
+
+    // Guardar en Trends como climatech (forzado)
+    const trendsSvc = new TrendsService();
+    const feedbackSvc = new FeedbackService();
+    const inserts = [];
+
+    if (Array.isArray(relacionados) && relacionados.length > 0) {
+      // Si hay newsletters relacionados, crear trends con esas relaciones
+      console.log(`📦 Preparando inserciones de relaciones forzadas (${relacionados.length})`);
+      for (const nl of relacionados) {
+        const payload = {
+          id_newsletter: nl.id || null,
+          Título_del_Trend: extraido.titulo || '',
+          Link_del_Trend: urlForAnalyze,
+          Nombre_Newsletter_Relacionado: nl.titulo || '',
+          Fecha_Relación: nl.fechaRelacion || new Date().toISOString(),
+          Relacionado: true,
+          Analisis_relacion: `[FORZADO_COMO_CLIMATECH] ${nl.analisisRelacion || 'Noticia forzada como climatech por el usuario'}`,
+        };
+        console.log('📝 Insert payload (forzado, relacionado=true):', payload);
+        const created = await trendsSvc.createAsync(payload);
+        if (!created?.duplicated) {
+          inserts.push({
+            id: created?.id,
+            id_newsletter: created?.id_newsletter ?? payload.id_newsletter,
+            Título_del_Trend: created?.['Título_del_Trend'] ?? payload.Título_del_Trend,
+            Link_del_Trend: created?.['Link_del_Trend'] ?? payload.Link_del_Trend,
+            Nombre_Newsletter_Relacionado: created?.['Nombre_Newsletter_Relacionado'] ?? payload.Nombre_Newsletter_Relacionado,
+            Fecha_Relación: created?.['Fecha_Relación'] ?? payload.Fecha_Relación,
+            Relacionado: created?.['Relacionado'] ?? payload.Relacionado,
+            Analisis_relacion: created?.['Analisis_relacion'] ?? payload.Analisis_relacion,
+            newsletterLink: nl.link || '',
+            forzado: true
+          });
+
+          // Notificar al EventBus
+          try {
+            const trendData = {
+              id: created?.id,
+              newsletterTitulo: nl.titulo || '',
+              newsletterId: nl.id ?? '',
+              fechaRelacion: nl.fechaRelacion || new Date().toISOString(),
+              trendTitulo: extraido.titulo || '',
+              trendLink: urlForAnalyze,
+              relacionado: true,
+              newsletterLink: nl.link || '',
+              analisisRelacion: nl.analisisRelacion || '',
+              resumenFama: resumen || '',
+              autor: extraido.autor || '',
+              forzado: true
+            };
+            eventBus.notifyNewTrend(trendData);
+            console.log(`📡 Nuevo trend forzado notificado: ${trendData.trendTitulo}`);
+          } catch (eventError) {
+            console.error('Error notificando trend forzado:', eventError);
+          }
+        } else {
+          console.log('⛔ Relación duplicada evitada (forzar):', payload.Link_del_Trend, payload.id_newsletter);
+        }
+      }
+    } else {
+      // Si NO hay newsletters relacionados, crear trend SIN relación pero marcado como forzado
+      const payload = {
+        id_newsletter: null,
+        Título_del_Trend: extraido.titulo || '',
+        Link_del_Trend: urlForAnalyze,
+        Nombre_Newsletter_Relacionado: '',
+        Fecha_Relación: new Date().toISOString(),
+        Relacionado: false,
+        Analisis_relacion: `[FORZADO_COMO_CLIMATECH] Noticia forzada como climatech por el usuario. ${motivoSinRelacion || 'Sin newsletter relacionado'}`,
+      };
+      console.log('📝 Insert payload (forzado, relacionado=false):', payload);
+      const created = await trendsSvc.createAsync(payload);
+      if (!created?.duplicated) {
+        inserts.push({
+          id: created?.id,
+          id_newsletter: created?.id_newsletter ?? payload.id_newsletter,
+          Título_del_Trend: created?.['Título_del_Trend'] ?? payload.Título_del_Trend,
+          Link_del_Trend: created?.['Link_del_Trend'] ?? payload.Link_del_Trend,
+          Nombre_Newsletter_Relacionado: created?.['Nombre_Newsletter_Relacionado'] ?? payload.Nombre_Newsletter_Relacionado,
+          Fecha_Relación: created?.['Fecha_Relación'] ?? payload.Fecha_Relación,
+          Relacionado: created?.['Relacionado'] ?? payload.Relacionado,
+          Analisis_relacion: created?.['Analisis_relacion'] ?? payload.Analisis_relacion,
+          newsletterLink: '',
+          forzado: true
+        });
+
+        // Notificar al EventBus
+        try {
+          const trendData = {
+            id: created?.id,
+            newsletterTitulo: '',
+            newsletterId: '',
+            fechaRelacion: new Date().toISOString(),
+            trendTitulo: extraido.titulo || '',
+            trendLink: urlForAnalyze,
+            relacionado: false,
+            newsletterLink: '',
+            analisisRelacion: 'Noticia forzada como climatech por el usuario',
+            resumenFama: resumen || '',
+            autor: extraido.autor || '',
+            forzado: true
+          };
+          eventBus.notifyNewTrend(trendData);
+          console.log(`📡 Nuevo trend forzado sin newsletter notificado: ${trendData.trendTitulo}`);
+        } catch (eventError) {
+          console.error('Error notificando trend forzado:', eventError);
+        }
+      }
+    }
+
+    // Enviar feedback negativo a /api/Feedback indicando que la IA se equivocó
+    try {
+      const feedbackPayload = {
+        trendId: inserts.length > 0 ? inserts[0].id : null,
+        action: 'force_climatech',
+        reason: 'ia_error',
+        feedback: 'negative',
+        trendData: {
+          trendTitulo: extraido.titulo || '',
+          trendLink: urlForAnalyze,
+          newsletterId: inserts.length > 0 && inserts[0].id_newsletter ? inserts[0].id_newsletter : null,
+          newsletterTitulo: inserts.length > 0 ? inserts[0].Nombre_Newsletter_Relacionado : ''
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      const feedbackCreated = await feedbackSvc.createAsync(feedbackPayload);
+      console.log(`✅ Feedback negativo registrado:`, {
+        id: feedbackCreated?.id,
+        action: feedbackCreated?.action,
+        reason: feedbackCreated?.reason
+      });
+    } catch (feedbackError) {
+      console.error('⚠️ Error registrando feedback negativo:', feedbackError?.message || feedbackError);
+      // No fallar la operación si el feedback falla
+    }
+
+    console.log('📊 Resultado final del forzar climatech:', {
+      insertsCount: inserts.length,
+      inserts: inserts.map(i => ({ id: i.id, titulo: i.Título_del_Trend, relacionado: i.Relacionado }))
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Noticia forzada como climatech exitosamente',
+      url: urlForAnalyze,
+      titulo: extraido.titulo || '',
+      resumen: resumen,
+      newslettersRelacionados: relacionados.map(nl => ({
+        id: nl.id ?? null,
+        titulo: nl.titulo || '',
+        link: nl.link || '',
+        puntuacion: nl.puntuacion ?? null,
+        analisisRelacion: nl.analisisRelacion || '',
+      })),
+      inserts: inserts,
+      forzado: true
+    });
+  } catch (e) {
+    console.error('Error en /api/Newsletter/forzarClimatech:', e);
     const msg = String(e?.message || '').toLowerCase();
     if (msg.includes('403') || msg.includes('forbidden') || msg.includes('429')) {
       return res.status(502).json({ error: 'La fuente bloqueó la extracción (403/429). Intenta otra URL o más tarde.' });
