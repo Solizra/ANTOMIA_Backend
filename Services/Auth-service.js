@@ -395,6 +395,19 @@ class AuthService {
     }
   }
 
+  // Obtener todos los emails válidos desde el origen de autenticación (incluye Supabase auth.users)
+  async listAllUserEmails() {
+    try {
+      const users = await this.authRepository.listAllUsers();
+      return users
+        .map(u => String(u.email || '').trim().toLowerCase())
+        .filter(e => e && e.includes('@'));
+    } catch (error) {
+      console.error('❌ Error en listAllUserEmails:', error);
+      throw error;
+    }
+  }
+
   // Desactivar usuario
   async deactivateUser(userId) {
     try {

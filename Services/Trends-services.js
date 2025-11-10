@@ -7,6 +7,9 @@ export default class TrendsService {
   constructor() {
     this.repo = new TrendsRepository();
     this.pool = null;
+    // Lazy load to avoid circular deps at import time
+    this._authService = null;
+    this._emailService = null;
   }
 
   // Obtener pool de conexiones reutilizable
@@ -86,7 +89,33 @@ export default class TrendsService {
       if (typeof this.repo.createAsync !== 'function') {
         throw new Error('TrendsRepository.createAsync no está disponible en este despliegue');
       }
-      return await this.repo.createAsync(payload);
+      const created = await this.repo.createAsync(payload);
+
+      // Notificar por email a usuarios autenticados (excepto excluidos)
+      try {
+        if (!this._authService) {
+          const { default: AuthService } = await import('./Auth-service.js');
+          this._authService = new AuthService();
+        }
+        if (!this._emailService) {
+          const { default: EmailService } = await import('./Email-service.js');
+          this._emailService = new EmailService();
+        }
+
+        const allEmails = await this._authService.listAllUserEmails();
+        const excluded = new Set(['ruben@antom.la', 'paula@antom.la'].map(e => e.toLowerCase()));
+        const unique = Array.from(new Set(allEmails)).filter(e => !excluded.has(e));
+
+        if (unique.length > 0) {
+          await this._emailService.sendNewTrendNotification(unique, created);
+        } else {
+          console.log('✉️ No hay destinatarios para notificación de Trend (tras exclusiones)');
+        }
+      } catch (notifyErr) {
+        console.warn('⚠️ No se pudo enviar notificación de nuevo Trend:', notifyErr?.message || notifyErr);
+      }
+
+      return created;
     } catch (error) {
       console.error('Error en TrendsService.createAsync:', error);
       throw error;
