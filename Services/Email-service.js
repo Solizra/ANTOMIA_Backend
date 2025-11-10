@@ -6,6 +6,10 @@ class EmailService {
     this.initializeTransporter();
   }
 
+  isEnabled() {
+    return !!this.transporter;
+  }
+
   initializeTransporter() {
     try {
       const emailDisabled = String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true';
@@ -42,6 +46,52 @@ class EmailService {
     }
   }
 
+  // Enviar notificación de nuevo Trend (BCC masivo para eficiencia)
+  async sendNewTrendNotification(recipients, trend) {
+    try {
+      if (!Array.isArray(recipients) || recipients.length === 0) {
+        return { skipped: true, reason: 'sin destinatarios' };
+      }
+
+      if (!this.transporter) {
+        console.warn('✉️ Notificación de Trend omitida (email deshabilitado).');
+        return { skipped: true };
+      }
+
+      const subject = `Nuevo Trend: ${trend?.['Título_del_Trend'] || trend?.Titulo || 'ANTOMIA'}`;
+
+      const link = trend?.['Link_del_Trend'] || trend?.link || '';
+      const nl = trend?.['Nombre_Newsletter_Relacionado'] || trend?.newsletter || '';
+      const html = `
+        <div style="font-family: Arial, sans-serif; line-height:1.5;">
+          <h2 style="margin:0 0 12px 0;">Nuevo Trend disponible</h2>
+          <p style="margin:0 0 8px 0;"><strong>Título:</strong> ${trend?.['Título_del_Trend'] || 'Sin título'}</p>
+          ${nl ? `<p style="margin:0 0 8px 0;"><strong>Newsletter:</strong> ${nl}</p>` : ''}
+          ${link ? `<p style="margin:0 0 12px 0;"><strong>Link:</strong> <a href="${link}" target="_blank" rel="noopener">${link}</a></p>` : ''}
+          <p style="color:#777;font-size:12px;margin-top:16px;">Este mensaje fue enviado automáticamente por ANTOMIA.</p>
+        </div>
+      `;
+      const text = `Nuevo Trend disponible
+Titulo: ${trend?.['Título_del_Trend'] || 'Sin título'}
+${nl ? `Newsletter: ${nl}\n` : ''}${link ? `Link: ${link}\n` : ''}`;
+
+      const mailOptions = {
+        from: `"ANTOMIA" <${process.env.EMAIL_FROM}>`,
+        to: process.env.EMAIL_FROM, // placeholder
+        bcc: recipients,
+        subject,
+        html,
+        text
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Notificación de nuevo Trend enviada a ${recipients.length} destinatarios`);
+      return result;
+    } catch (error) {
+      console.error('❌ Error enviando notificación de Trend:', error);
+      throw error;
+    }
+  }
   // Enviar email de recuperación de contraseña
   async sendPasswordResetEmail(email, resetToken, userName = 'Usuario') {
     try {

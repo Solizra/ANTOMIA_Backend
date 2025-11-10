@@ -5,14 +5,51 @@ const { Pool } = pkg;
 class AuthRepository {
   constructor() {
     this.pool = new Pool(DBConfig);
+    this.userSource = null; // { type: 'custom' | 'supabase', table: string }
+  }
+
+  // Detectar y cachear fuente de usuarios: tabla app "Users" o Supabase "auth.users"
+  async resolveUserSource() {
+    if (this.userSource) return this.userSource;
+    try {
+      const checkCustom = await this.pool.query(`SELECT to_regclass('public."Users"') AS exists_ref`);
+      const existsCustom = !!checkCustom.rows[0]?.exists_ref;
+      if (existsCustom) {
+        this.userSource = { type: 'custom', table: `public."Users"` };
+        return this.userSource;
+      }
+    } catch {}
+    // Fallback a Supabase
+    this.userSource = { type: 'supabase', table: 'auth.users' };
+    return this.userSource;
   }
 
   // Buscar usuario por email
   async findUserByEmail(email) {
     try {
-      const query = 'SELECT * FROM "Users" WHERE email = $1 AND activo = true';
-      const result = await this.pool.query(query, [email]);
-      return result.rows[0] || null;
+      const source = await this.resolveUserSource();
+      if (source.type === 'custom') {
+        const query = 'SELECT * FROM "Users" WHERE email = $1 AND activo = true';
+        const result = await this.pool.query(query, [email]);
+        return result.rows[0] || null;
+      } else {
+        const result = await this.pool.query(
+          `SELECT id, email, raw_user_meta_data, email_confirmed_at, created_at FROM auth.users WHERE email = $1`,
+          [email]
+        );
+        const row = result.rows[0];
+        if (!row) return null;
+        const meta = row.raw_user_meta_data || {};
+        return {
+          id: row.id,
+          email: row.email,
+          nombre: meta.nombre || meta.first_name || null,
+          apellido: meta.apellido || meta.last_name || null,
+          activo: true,
+          email_verificado: !!row.email_confirmed_at,
+          fecha_creacion: row.created_at
+        };
+      }
     } catch (error) {
       console.error('Error en findUserByEmail:', error);
       throw error;
@@ -151,56 +188,60 @@ class AuthRepository {
   // Eliminar usuario por email (admin)
   async deleteUserByEmail(email) {
     try {
-      // Ejecutar en transacción para mantener consistencia referencial
-      const client = await this.pool.connect();
-      try {
-        await client.query('BEGIN');
+      const source = await this.resolveUserSource();
+      if (source.type === 'custom') {
+        // Ejecutar en transacción para mantener consistencia referencial
+        const client = await this.pool.connect();
+        try {
+          await client.query('BEGIN');
 
-        // Obtener ID del usuario por email (sin filtrar por activo)
-        const userResult = await client.query(
-          `SELECT id FROM "Users" WHERE email = $1`,
+          // Obtener ID del usuario por email (sin filtrar por activo)
+          const userResult = await client.query(`SELECT id FROM "Users" WHERE email = $1`, [email]);
+          const userRow = userResult.rows[0];
+          if (!userRow) {
+            await client.query('ROLLBACK');
+            return null;
+          }
+          const userId = userRow.id;
+
+          // Eliminar relaciones de UsuariosAgregados
+          try {
+            await client.query(
+              `DELETE FROM "UsuariosAgregados" WHERE "UsuarioAgregado" = $1 OR "UsuarioJefe" = $1`,
+              [userId]
+            );
+          } catch (e) {
+            if (!(e && e.code === '42P01')) throw e;
+          }
+
+          // Eliminar tokens de reseteo
+          try {
+            await client.query(`DELETE FROM "PasswordResetTokens" WHERE user_id = $1`, [userId]);
+          } catch (e) {
+            if (!(e && e.code === '42P01')) throw e;
+          }
+
+          // Eliminar usuario
+          const deleteUserResult = await client.query(
+            `DELETE FROM "Users" WHERE id = $1 RETURNING id, email`,
+            [userId]
+          );
+
+          await client.query('COMMIT');
+          return deleteUserResult.rows[0] || null;
+        } catch (txError) {
+          await client.query('ROLLBACK');
+          throw txError;
+        } finally {
+          client.release();
+        }
+      } else {
+        // Supabase: eliminar directamente de auth.users por email
+        const result = await this.pool.query(
+          `DELETE FROM auth.users WHERE email = $1 RETURNING id, email`,
           [email]
         );
-        const userRow = userResult.rows[0];
-        if (!userRow) {
-          await client.query('ROLLBACK');
-          return null;
-        }
-        const userId = userRow.id;
-
-        // Eliminar relaciones de UsuariosAgregados
-        try {
-          await client.query(
-            `DELETE FROM "UsuariosAgregados" WHERE "UsuarioAgregado" = $1 OR "UsuarioJefe" = $1`,
-            [userId]
-          );
-        } catch (e) {
-          if (!(e && e.code === '42P01')) throw e;
-        }
-
-        // Eliminar tokens de reseteo
-        try {
-          await client.query(
-            `DELETE FROM "PasswordResetTokens" WHERE user_id = $1`,
-            [userId]
-          );
-        } catch (e) {
-          if (!(e && e.code === '42P01')) throw e;
-        }
-
-        // Eliminar usuario
-        const deleteUserResult = await client.query(
-          `DELETE FROM "Users" WHERE id = $1 RETURNING id, email`,
-          [userId]
-        );
-
-        await client.query('COMMIT');
-        return deleteUserResult.rows[0] || null;
-      } catch (txError) {
-        await client.query('ROLLBACK');
-        throw txError;
-      } finally {
-        client.release();
+        return result.rows[0] || null;
       }
     } catch (error) {
       console.error('Error en deleteUserByEmail:', error);
@@ -314,9 +355,14 @@ class AuthRepository {
   // Verificar si el email ya existe
   async emailExists(email) {
     try {
-      const query = 'SELECT id FROM "Users" WHERE email = $1';
-      const result = await this.pool.query(query, [email]);
-      return result.rows.length > 0;
+      const source = await this.resolveUserSource();
+      if (source.type === 'custom') {
+        const result = await this.pool.query('SELECT id FROM "Users" WHERE email = $1', [email]);
+        return result.rows.length > 0;
+      } else {
+        const result = await this.pool.query('SELECT id FROM auth.users WHERE email = $1', [email]);
+        return result.rows.length > 0;
+      }
     } catch (error) {
       console.error('Error en emailExists:', error);
       throw error;
@@ -362,9 +408,29 @@ class AuthRepository {
   // Listar todos los usuarios (para administración)
   async listAllUsers() {
     try {
-      const query = 'SELECT id, email, nombre, apellido, activo, email_verificado, fecha_creacion FROM "Users" ORDER BY fecha_creacion DESC';
-      const result = await this.pool.query(query);
-      return result.rows;
+      const source = await this.resolveUserSource();
+      if (source.type === 'custom') {
+        const result = await this.pool.query(
+          'SELECT id, email, nombre, apellido, activo, email_verificado, fecha_creacion FROM "Users" ORDER BY fecha_creacion DESC'
+        );
+        return result.rows;
+      } else {
+        const result = await this.pool.query(
+          'SELECT id, email, raw_user_meta_data, email_confirmed_at, created_at FROM auth.users ORDER BY created_at DESC'
+        );
+        return result.rows.map(row => {
+          const meta = row.raw_user_meta_data || {};
+          return {
+            id: row.id,
+            email: row.email,
+            nombre: meta.nombre || meta.first_name || null,
+            apellido: meta.apellido || meta.last_name || null,
+            activo: true,
+            email_verificado: !!row.email_confirmed_at,
+            fecha_creacion: row.created_at
+          };
+        });
+      }
     } catch (error) {
       console.error('Error en listAllUsers:', error);
       throw error;
