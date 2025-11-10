@@ -991,7 +991,7 @@ function filtrarNewslettersPorPalabrasClave(resumenNoticia, newsletters, opcione
       );
 
       // Criterios mínimos para ser candidato
-      const esCandidato = coincidenciasTokens.length >= 4 || coincidenciasClave >= 1 || similitudJaccard >= 0.09;
+      const esCandidato = coincidenciasTokens.length >= 5 || coincidenciasClave >= 1 || similitudJaccard >= 0.6;
 
       if (esCandidato) {
         candidatos.push({
