@@ -108,16 +108,25 @@ class AuthRepository {
 
         // Eliminar relaciones de UsuariosAgregados donde el usuario
         // sea agregado o jefe para evitar violaciones de FK
-        await client.query(
-          `DELETE FROM "UsuariosAgregados" WHERE "UsuarioAgregado" = $1 OR "UsuarioJefe" = $1`,
-          [userId]
-        );
+        try {
+          await client.query(
+            `DELETE FROM "UsuariosAgregados" WHERE "UsuarioAgregado" = $1 OR "UsuarioJefe" = $1`,
+            [userId]
+          );
+        } catch (e) {
+          // Si la tabla no existe en este entorno, ignorar y continuar
+          if (!(e && e.code === '42P01')) throw e;
+        }
 
         // Eliminar tokens de reseteo de contraseña asociados
-        await client.query(
-          `DELETE FROM "PasswordResetTokens" WHERE user_id = $1`,
-          [userId]
-        );
+        try {
+          await client.query(
+            `DELETE FROM "PasswordResetTokens" WHERE user_id = $1`,
+            [userId]
+          );
+        } catch (e) {
+          if (!(e && e.code === '42P01')) throw e;
+        }
 
         // Finalmente eliminar el usuario
         const deleteUserResult = await client.query(
@@ -160,16 +169,24 @@ class AuthRepository {
         const userId = userRow.id;
 
         // Eliminar relaciones de UsuariosAgregados
-        await client.query(
-          `DELETE FROM "UsuariosAgregados" WHERE "UsuarioAgregado" = $1 OR "UsuarioJefe" = $1`,
-          [userId]
-        );
+        try {
+          await client.query(
+            `DELETE FROM "UsuariosAgregados" WHERE "UsuarioAgregado" = $1 OR "UsuarioJefe" = $1`,
+            [userId]
+          );
+        } catch (e) {
+          if (!(e && e.code === '42P01')) throw e;
+        }
 
         // Eliminar tokens de reseteo
-        await client.query(
-          `DELETE FROM "PasswordResetTokens" WHERE user_id = $1`,
-          [userId]
-        );
+        try {
+          await client.query(
+            `DELETE FROM "PasswordResetTokens" WHERE user_id = $1`,
+            [userId]
+          );
+        } catch (e) {
+          if (!(e && e.code === '42P01')) throw e;
+        }
 
         // Eliminar usuario
         const deleteUserResult = await client.query(
