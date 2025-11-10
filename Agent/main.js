@@ -1013,7 +1013,7 @@ function filtrarNewslettersPorPalabrasClave(resumenNoticia, newsletters, opcione
       const condicion4 = scoreFiltro >= 20 && (coincidenciasTokens.length >= 5 || coincidenciasClave >= 1);
       
       // Además, requerir un mínimo de similitud Jaccard razonable
-      const jaccardMinimo = similitudJaccard >= 0.12; // Aumentado de 0.09 (implícito) a 0.12
+      const jaccardMinimo = similitudJaccard >= 0.03; // Aumentado de 0.09 (implícito) a 0.12
       
       const esCandidato = (condicion1 || condicion2 || condicion3 || condicion4) && jaccardMinimo;
 
