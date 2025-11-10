@@ -101,13 +101,38 @@ class AuthRepository {
   // Eliminar usuario definitivamente (admin)
   async deleteUser(userId) {
     try {
-      const query = `
-        DELETE FROM "Users"
-        WHERE id = $1
-        RETURNING id, email
-      `;
-      const result = await this.pool.query(query, [userId]);
-      return result.rows[0] || null;
+      // Ejecutar en transacción para mantener consistencia referencial
+      const client = await this.pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        // Eliminar relaciones de UsuariosAgregados donde el usuario
+        // sea agregado o jefe para evitar violaciones de FK
+        await client.query(
+          `DELETE FROM "UsuariosAgregados" WHERE "UsuarioAgregado" = $1 OR "UsuarioJefe" = $1`,
+          [userId]
+        );
+
+        // Eliminar tokens de reseteo de contraseña asociados
+        await client.query(
+          `DELETE FROM "PasswordResetTokens" WHERE user_id = $1`,
+          [userId]
+        );
+
+        // Finalmente eliminar el usuario
+        const deleteUserResult = await client.query(
+          `DELETE FROM "Users" WHERE id = $1 RETURNING id, email`,
+          [userId]
+        );
+
+        await client.query('COMMIT');
+        return deleteUserResult.rows[0] || null;
+      } catch (txError) {
+        await client.query('ROLLBACK');
+        throw txError;
+      } finally {
+        client.release();
+      }
     } catch (error) {
       console.error('Error en deleteUser:', error);
       throw error;
@@ -117,13 +142,49 @@ class AuthRepository {
   // Eliminar usuario por email (admin)
   async deleteUserByEmail(email) {
     try {
-      const query = `
-        DELETE FROM "Users"
-        WHERE email = $1
-        RETURNING id, email
-      `;
-      const result = await this.pool.query(query, [email]);
-      return result.rows[0] || null;
+      // Ejecutar en transacción para mantener consistencia referencial
+      const client = await this.pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        // Obtener ID del usuario por email (sin filtrar por activo)
+        const userResult = await client.query(
+          `SELECT id FROM "Users" WHERE email = $1`,
+          [email]
+        );
+        const userRow = userResult.rows[0];
+        if (!userRow) {
+          await client.query('ROLLBACK');
+          return null;
+        }
+        const userId = userRow.id;
+
+        // Eliminar relaciones de UsuariosAgregados
+        await client.query(
+          `DELETE FROM "UsuariosAgregados" WHERE "UsuarioAgregado" = $1 OR "UsuarioJefe" = $1`,
+          [userId]
+        );
+
+        // Eliminar tokens de reseteo
+        await client.query(
+          `DELETE FROM "PasswordResetTokens" WHERE user_id = $1`,
+          [userId]
+        );
+
+        // Eliminar usuario
+        const deleteUserResult = await client.query(
+          `DELETE FROM "Users" WHERE id = $1 RETURNING id, email`,
+          [userId]
+        );
+
+        await client.query('COMMIT');
+        return deleteUserResult.rows[0] || null;
+      } catch (txError) {
+        await client.query('ROLLBACK');
+        throw txError;
+      } finally {
+        client.release();
+      }
     } catch (error) {
       console.error('Error en deleteUserByEmail:', error);
       throw error;
