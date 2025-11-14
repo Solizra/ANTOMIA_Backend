@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import NewsletterService from '../Services/Newsletter-services.js';
-import { analizarNoticiaEstructurada, resumirDesdeUrl, extraerContenidoNoticia, generarResumenIA, obtenerNewslettersBDD, compararConNewslettersLocal } from '../Agent/main.js';
+import { analizarNoticiaEstructurada, resumirDesdeUrl, extraerContenidoNoticia, generarResumenIA, obtenerNewslettersBDD, compararConNewslettersLocal, detectarIdioma, traducirInglesAEspanol } from '../Agent/main.js';
 import TrendsService from '../Services/Trends-services.js';
 import FeedbackService from '../Services/Feedback-service.js';
 import eventBus from '../EventBus.js';
@@ -318,9 +318,28 @@ router.post('/forzarClimatech', async (req, res) => {
       return res.status(422).json({ error: 'No se pudo extraer contenido de la URL.' });
     }
 
-    const textoNoticia = extraido.contenido || '';
-    console.log(`📝 Título extraído: ${extraido.titulo || 'Sin título'}`);
+    let textoNoticia = extraido.contenido || '';
+    let tituloNoticia = extraido.titulo || '';
+    console.log(`📝 Título extraído: ${tituloNoticia}`);
     console.log(`📄 Contenido extraído: ${textoNoticia.length} caracteres`);
+
+    // Detectar idioma y traducir si es necesario
+    console.log(`\n🌐 DETECTANDO IDIOMA...`);
+    const idioma = detectarIdioma(textoNoticia);
+    console.log(`✅ Idioma detectado: ${idioma === 'en' ? 'Inglés' : 'Español'}`);
+    
+    if (idioma === 'en') {
+      console.log(`🔄 Traduciendo contenido al español...`);
+      textoNoticia = await traducirInglesAEspanol(textoNoticia);
+      
+      // También traducir el título si es necesario
+      if (tituloNoticia && detectarIdioma(tituloNoticia) === 'en') {
+        console.log(`🔄 Traduciendo título al español...`);
+        tituloNoticia = await traducirInglesAEspanol(tituloNoticia);
+      }
+      
+      console.log(`✅ Contenido traducido: ${textoNoticia.length} caracteres`);
+    }
 
     // Generar resumen con IA (sin clasificar si es climatech)
     console.log(`\n🤖 GENERANDO RESUMEN CON IA...`);
@@ -351,7 +370,7 @@ router.post('/forzarClimatech', async (req, res) => {
       for (const nl of relacionados) {
         const payload = {
           id_newsletter: nl.id || null,
-          Título_del_Trend: extraido.titulo || '',
+          Título_del_Trend: tituloNoticia || extraido.titulo || '',
           Link_del_Trend: urlForAnalyze,
           Nombre_Newsletter_Relacionado: nl.titulo || '',
           Fecha_Relación: nl.fechaRelacion || new Date().toISOString(),
@@ -381,7 +400,7 @@ router.post('/forzarClimatech', async (req, res) => {
               newsletterTitulo: nl.titulo || '',
               newsletterId: nl.id ?? '',
               fechaRelacion: nl.fechaRelacion || new Date().toISOString(),
-              trendTitulo: extraido.titulo || '',
+              trendTitulo: tituloNoticia || extraido.titulo || '',
               trendLink: urlForAnalyze,
               relacionado: true,
               newsletterLink: nl.link || '',
@@ -403,7 +422,7 @@ router.post('/forzarClimatech', async (req, res) => {
       // Si NO hay newsletters relacionados, crear trend SIN relación pero marcado como forzado
       const payload = {
         id_newsletter: null,
-        Título_del_Trend: extraido.titulo || '',
+        Título_del_Trend: tituloNoticia || extraido.titulo || '',
         Link_del_Trend: urlForAnalyze,
         Nombre_Newsletter_Relacionado: '',
         Fecha_Relación: new Date().toISOString(),
@@ -433,7 +452,7 @@ router.post('/forzarClimatech', async (req, res) => {
             newsletterTitulo: '',
             newsletterId: '',
             fechaRelacion: new Date().toISOString(),
-            trendTitulo: extraido.titulo || '',
+            trendTitulo: tituloNoticia || extraido.titulo || '',
             trendLink: urlForAnalyze,
             relacionado: false,
             newsletterLink: '',
@@ -486,7 +505,7 @@ router.post('/forzarClimatech', async (req, res) => {
       success: true,
       message: 'Noticia forzada como climatech exitosamente',
       url: urlForAnalyze,
-      titulo: extraido.titulo || '',
+      titulo: tituloNoticia || extraido.titulo || '',
       resumen: resumen,
       newslettersRelacionados: relacionados.map(nl => ({
         id: nl.id ?? null,

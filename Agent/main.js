@@ -908,6 +908,123 @@ async function esClimatechIA(contenido) {
 }
 
 
+// Función para detectar si un texto está principalmente en inglés
+export function detectarIdioma(texto) {
+  try {
+    if (!texto || typeof texto !== 'string' || texto.trim().length === 0) {
+      return 'es'; // Por defecto español
+    }
+    
+    // Palabras comunes en inglés vs español
+    const palabrasIngles = ['the', 'and', 'is', 'are', 'was', 'were', 'this', 'that', 'with', 'for', 'from', 'have', 'has', 'had', 'will', 'would', 'could', 'should', 'can', 'may', 'might', 'must', 'been', 'being', 'their', 'there', 'these', 'those', 'which', 'what', 'when', 'where', 'why', 'how', 'who', 'whom', 'whose'];
+    const palabrasEspanol = ['el', 'la', 'los', 'las', 'de', 'del', 'en', 'un', 'una', 'unos', 'unas', 'es', 'son', 'era', 'eran', 'fue', 'fueron', 'ser', 'estar', 'tener', 'haber', 'hacer', 'poder', 'deber', 'querer', 'decir', 'ver', 'saber', 'conocer', 'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'esos', 'esas', 'aquel', 'aquella', 'aquellos', 'aquellas', 'que', 'cual', 'cuales', 'quien', 'quienes', 'cuando', 'donde', 'como', 'porque', 'por que'];
+    
+    const textoLower = texto.toLowerCase();
+    const palabras = textoLower.split(/\s+/).filter(p => p.length > 2);
+    
+    if (palabras.length === 0) return 'es';
+    
+    let contadorIngles = 0;
+    let contadorEspanol = 0;
+    
+    palabras.forEach(palabra => {
+      const palabraLimpia = palabra.replace(/[^a-záéíóúñü]/g, '');
+      if (palabrasIngles.includes(palabraLimpia)) contadorIngles++;
+      if (palabrasEspanol.includes(palabraLimpia)) contadorEspanol++;
+    });
+    
+    // Si hay más palabras en inglés que en español, probablemente es inglés
+    if (contadorIngles > contadorEspanol * 1.5) {
+      return 'en';
+    }
+    
+    // También verificar patrones comunes de inglés
+    const patronesIngles = /\b(the|and|is|are|was|were|this|that|with|for|from|have|has|had|will|would|could|should)\b/gi;
+    const patronesEspanol = /\b(el|la|los|las|de|del|en|un|una|es|son|era|eran|fue|fueron|con|por|para|que|cual)\b/gi;
+    
+    const matchesIngles = (texto.match(patronesIngles) || []).length;
+    const matchesEspanol = (texto.match(patronesEspanol) || []).length;
+    
+    if (matchesIngles > matchesEspanol * 1.5) {
+      return 'en';
+    }
+    
+    return 'es';
+  } catch (error) {
+    console.error('Error detectando idioma:', error);
+    return 'es'; // Por defecto español
+  }
+}
+
+// Función para traducir texto de inglés a español usando OpenAI
+export async function traducirInglesAEspanol(texto) {
+  try {
+    if (!texto || typeof texto !== 'string' || texto.trim().length === 0) {
+      return texto;
+    }
+    
+    console.log(`🌐 Traduciendo texto de inglés a español (${texto.length} caracteres)...`);
+    
+    // Si el texto es muy largo, dividirlo en chunks
+    const maxChunkSize = 3000; // Caracteres por chunk
+    if (texto.length <= maxChunkSize) {
+      // Traducción directa
+      const messages = [
+        { role: "system", content: "Eres un traductor profesional especializado en traducción técnica y de noticias. Traduce el texto del inglés al español manteniendo el significado exacto, la terminología técnica y el contexto. No agregues información adicional, solo traduce fielmente." },
+        { role: "user", content: `Traduce el siguiente texto del inglés al español. Mantén la terminología técnica y el contexto exacto:\n\n${texto}` }
+      ];
+      
+      const resp = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages,
+        temperature: 0.3
+      });
+      
+      const traducido = resp?.choices?.[0]?.message?.content?.trim?.() || texto;
+      console.log(`✅ Traducción completada (${traducido.length} caracteres)`);
+      return traducido;
+    } else {
+      // Dividir en chunks y traducir cada uno
+      console.log(`📦 Texto largo detectado, dividiendo en chunks...`);
+      const chunks = [];
+      for (let i = 0; i < texto.length; i += maxChunkSize) {
+        chunks.push(texto.substring(i, i + maxChunkSize));
+      }
+      
+      const traducciones = [];
+      for (let i = 0; i < chunks.length; i++) {
+        console.log(`🔄 Traduciendo chunk ${i + 1}/${chunks.length}...`);
+        const messages = [
+          { role: "system", content: "Eres un traductor profesional especializado en traducción técnica y de noticias. Traduce el texto del inglés al español manteniendo el significado exacto, la terminología técnica y el contexto. No agregues información adicional, solo traduce fielmente." },
+          { role: "user", content: `Traduce el siguiente fragmento del inglés al español. Mantén la terminología técnica y el contexto exacto:\n\n${chunks[i]}` }
+        ];
+        
+        const resp = await client.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages,
+          temperature: 0.3
+        });
+        
+        const traducido = resp?.choices?.[0]?.message?.content?.trim?.() || chunks[i];
+        traducciones.push(traducido);
+        // Pequeña pausa entre chunks para evitar rate limiting
+        if (i < chunks.length - 1) {
+          await sleep(200);
+        }
+      }
+      
+      const traducidoCompleto = traducciones.join(' ');
+      console.log(`✅ Traducción completada (${traducidoCompleto.length} caracteres)`);
+      return traducidoCompleto;
+    }
+  } catch (err) {
+    console.error('Error traduciendo texto:', err);
+    // En caso de error, devolver el texto original
+    console.warn('⚠️ No se pudo traducir, usando texto original');
+    return texto;
+  }
+}
+
 async function explicarRelacionIA(noticia, newsletter) {
   try {
     console.log("Entre a: explicarRelacionIA");
@@ -1327,6 +1444,24 @@ async function analizarNoticia(input) {
       titulo = 'Texto proporcionado';
       }
 
+      // PASO 1.5: Detectar idioma y traducir si es necesario
+      console.log("PASO 1.5: Detectar idioma y traducir si es necesario")
+      const idioma = detectarIdioma(contenido);
+      console.log(`✅ Idioma detectado: ${idioma === 'en' ? 'Inglés' : 'Español'}`);
+      
+      if (idioma === 'en') {
+        console.log(`🔄 Traduciendo contenido al español...`);
+        contenido = await traducirInglesAEspanol(contenido);
+        
+        // También traducir el título si es necesario
+        if (titulo && detectarIdioma(titulo) === 'en') {
+          console.log(`🔄 Traduciendo título al español...`);
+          titulo = await traducirInglesAEspanol(titulo);
+        }
+        
+        console.log(`✅ Contenido traducido: ${contenido.length} caracteres`);
+      }
+
       // PASO 2: Generar resumen
       console.log("PASO 2: Entrar a generarResumenIA")
     const resumen = await generarResumenIA(contenido);
@@ -1401,10 +1536,29 @@ export async function analizarNoticiaEstructurada(url) {
   const extraido = await extraerContenidoNoticia(url);
   if (!extraido) return null;
 
-  const textoNoticia = extraido.contenido || '';
+  let textoNoticia = extraido.contenido || '';
+  let tituloNoticia = extraido.titulo || '';
 
-  console.log(`📝 Título extraído: ${extraido.titulo || 'Sin título'}`);
+  console.log(`📝 Título extraído: ${tituloNoticia}`);
   console.log(`📄 Contenido extraído: ${textoNoticia.length} caracteres`);
+
+  // Detectar idioma y traducir si es necesario
+  console.log(`\n🌐 DETECTANDO IDIOMA...`);
+  const idioma = detectarIdioma(textoNoticia);
+  console.log(`✅ Idioma detectado: ${idioma === 'en' ? 'Inglés' : 'Español'}`);
+  
+  if (idioma === 'en') {
+    console.log(`🔄 Traduciendo contenido al español...`);
+    textoNoticia = await traducirInglesAEspanol(textoNoticia);
+    
+    // También traducir el título si es necesario
+    if (tituloNoticia && detectarIdioma(tituloNoticia) === 'en') {
+      console.log(`🔄 Traduciendo título al español...`);
+      tituloNoticia = await traducirInglesAEspanol(tituloNoticia);
+    }
+    
+    console.log(`✅ Contenido traducido: ${textoNoticia.length} caracteres`);
+  }
 
   // IA
   console.log(`\n🤖 GENERANDO RESUMEN CON IA...`);
@@ -1444,7 +1598,7 @@ export async function analizarNoticiaEstructurada(url) {
   // Adaptar salida a lo que esperan los consumidores aguas abajo
   return {
     url,
-    titulo: extraido.titulo || '',
+    titulo: tituloNoticia || extraido.titulo || '',
     autor: extraido.autor || '',
     resumen,
     esClimatech: !!clasificacion?.esClimatech,
