@@ -1321,7 +1321,35 @@ export async function compararConNewslettersLocal(resumenNoticia, newsletters, u
         }
       } catch {}
 
-      const prompt = `Debes decidir si el resumen de una noticia está relacionado con el resumen de un newsletter. Responde SOLO con JSON válido con estas claves: relacionado (\"SI\" o \"NO\"), razon (explicación DETALLADA y ESPECÍFICA de 4 a 8 oraciones que incluya: 1) Nombres concretos de empresas, tecnologías, productos o lugares mencionados en ambos textos, 2) Temas específicos que comparten (ej: "ambos tratan sobre captura de carbono en la industria siderúrgica"), 3) Aspectos técnicos o de negocio que los conectan, 4) Contexto o implicaciones específicas de la relación, 5) Por qué esta relación es relevante. Evita explicaciones genéricas como "ambos hablan de energía" - sé específico mencionando qué tipo de energía, qué tecnología, qué empresa, etc.), score (0-100, opcional).${feedbackHints}\n\nResumen de noticia:\n${resumen}\n\nNewsletter:\n${textoDoc}`;
+      const prompt = `Debes decidir si el resumen de una noticia está relacionado con el resumen de un newsletter. 
+
+IMPORTANTE: Rechaza relaciones GENÉRICAS o VAGAS. Solo marca como relacionado si hay una conexión ESPECÍFICA y CONCRETA.
+
+CRITERIOS PARA RECHAZAR (marcar como NO relacionado):
+- Si solo comparten temas muy generales como "ambos hablan de energía", "ambos mencionan sostenibilidad", "ambos tratan de cambio climático" sin detalles específicos
+- Si el newsletter es muy genérico y cubre muchos temas sin profundizar en ninguno específico de la noticia
+- Si no hay menciones concretas de empresas, tecnologías, productos, lugares, métricas o casos específicos compartidos
+- Si la relación es solo temática superficial sin conexión técnica o de negocio específica
+
+CRITERIOS PARA ACEPTAR (marcar como SI relacionado):
+- Menciones específicas de la misma empresa, startup, tecnología o producto en ambos textos
+- Mismos lugares geográficos, proyectos específicos, o casos de estudio concretos
+- Mismas métricas, números, porcentajes o datos específicos mencionados
+- Misma tecnología específica (ej: "captura de carbono post-combustión en acerías", no solo "captura de carbono")
+- Mismo sector industrial específico con detalles técnicos compartidos
+- Mismos eventos, anuncios, rondas de inversión o lanzamientos específicos
+
+Responde SOLO con JSON válido con estas claves: 
+- relacionado (\"SI\" o \"NO\")
+- razon (explicación DETALLADA y ESPECÍFICA de 5 a 10 oraciones que DEBE incluir: 1) Nombres EXACTOS de empresas/startups/tecnologías/productos mencionados en AMBOS textos (si no hay nombres específicos compartidos, explica por qué aún así están relacionados), 2) Temas ESPECÍFICOS que comparten con detalles concretos (ej: "ambos tratan sobre captura de carbono post-combustión en plantas siderúrgicas de Europa", NO "ambos hablan de captura de carbono"), 3) Aspectos técnicos o de negocio ESPECÍFICOS que los conectan (tecnologías, procesos, modelos de negocio, métricas), 4) Contexto o implicaciones ESPECÍFICAS de la relación (por qué esta conexión particular es relevante), 5) Evidencia concreta de la relación (citas, datos, casos mencionados). Si no puedes proporcionar estos detalles específicos, la relación probablemente es genérica y debes marcar como NO relacionado), 
+- score (0-100, donde 0-40 = relación genérica/vaga, 41-70 = relación moderada con algunos detalles, 71-100 = relación muy específica con muchos detalles concretos)
+${feedbackHints}
+
+Resumen de noticia:
+${resumen}
+
+Newsletter:
+${textoDoc}`;
 
       try {
         console.log(`\n🧪 [EVALUACIÓN IA] Evaluando newsletter ${i + 1}/${newslettersFiltrados.length} para esta noticia: ${nl.titulo || 'Sin título'}`);
@@ -1338,7 +1366,7 @@ export async function compararConNewslettersLocal(resumenNoticia, newsletters, u
           } catch {}
         }
         const content = await chatCompletionJSON([
-          { role: "system", content: "Responde solo con JSON válido. La explicación en 'razon' debe ser DETALLADA y ESPECÍFICA, mencionando nombres concretos de empresas, tecnologías, lugares, temas específicos compartidos, aspectos técnicos o de negocio que los conectan, y por qué la relación es relevante. Evita generalidades. Ejemplo: {\\\"relacionado\\\":\\\"SI\\\",\\\"razon\\\":\\\"Ambos textos tratan sobre la implementación de sistemas de captura de carbono en plantas siderúrgicas. La noticia menciona específicamente a la empresa ArcelorMittal y su proyecto en Gijón, mientras que el newsletter analiza tecnologías de captura post-combustión aplicadas a la industria del acero. Ambos destacan el potencial de reducir emisiones de CO2 en un 30-40% mediante estas tecnologías y mencionan los desafíos de costos y escalabilidad. La relación es relevante porque conecta un caso específico de implementación con un análisis más amplio del sector.\\\",\\\"score\\\":85}" },
+          { role: "system", content: "Responde solo con JSON válido. RECHAZA relaciones genéricas o vagas. La explicación en 'razon' debe ser MUY DETALLADA y ESPECÍFICA, mencionando nombres EXACTOS de empresas/startups/tecnologías/productos compartidos, lugares específicos, métricas concretas, aspectos técnicos o de negocio específicos, y evidencia concreta. Si no puedes proporcionar estos detalles específicos, marca como NO relacionado. El score debe reflejar la especificidad: 0-40 = genérico (rechazar), 41-70 = moderado, 71-100 = muy específico. Ejemplo de relación ESPECÍFICA aceptable: {\\\"relacionado\\\":\\\"SI\\\",\\\"razon\\\":\\\"Ambos textos tratan sobre la implementación de sistemas de captura de carbono post-combustión en plantas siderúrgicas europeas. La noticia menciona específicamente a la empresa ArcelorMittal y su proyecto piloto en Gijón, España, con una inversión de 50 millones de euros. El newsletter analiza las mismas tecnologías de captura post-combustión (CCS) aplicadas específicamente a la industria del acero, mencionando el mismo rango de reducción de emisiones (30-40% de CO2) y los mismos desafíos técnicos de costos (200-300 euros por tonelada) y escalabilidad. Ambos mencionan el mismo contexto regulatorio europeo (ETS) y las mismas empresas proveedoras de tecnología (Carbon Clean, Climeworks). La relación es relevante porque conecta un caso específico de implementación concreta con un análisis técnico detallado del mismo sector y tecnología.\\\",\\\"score\\\":92}. Ejemplo de relación GENÉRICA a rechazar: {\\\"relacionado\\\":\\\"NO\\\",\\\"razon\\\":\\\"Aunque ambos textos mencionan temas de sostenibilidad y cambio climático, no hay detalles específicos compartidos. El newsletter es muy general y cubre múltiples verticales sin profundizar en los aspectos específicos mencionados en la noticia. No hay menciones de las mismas empresas, tecnologías, lugares o métricas concretas.\\\",\\\"score\\\":25}" },
           { role: "user", content: prompt }
         ]);
         console.log(`🔎 Respuesta RAW del modelo: ${content}`);
@@ -1348,9 +1376,75 @@ export async function compararConNewslettersLocal(resumenNoticia, newsletters, u
         if (prePenalty > 0) score = Math.max(0, score - prePenalty);
         const razon = typeof parsed?.razon === 'string' ? parsed.razon : '';
         const relacionado = String(parsed?.relacionado || '').toUpperCase() === 'SI';
+        
+        // Validación post-procesamiento: detectar y rechazar relaciones genéricas
+        const esRelacionGenerica = (razonText, scoreValue) => {
+          if (!razonText || razonText.length < 50) return true; // Muy corta = probablemente genérica
+          
+          const razonLower = razonText.toLowerCase();
+          
+          // Patrones que indican relación genérica
+          const patronesGenericos = [
+            /ambos hablan de/i,
+            /ambos mencionan/i,
+            /ambos tratan de/i,
+            /ambos se relacionan con/i,
+            /temas similares/i,
+            /temas relacionados/i,
+            /temática similar/i,
+            /temática relacionada/i,
+            /sin detalles específicos/i,
+            /no hay menciones específicas/i,
+            /relación general/i,
+            /conexión general/i,
+            /muy general/i,
+            /demasiado general/i,
+            /cubre muchos temas/i,
+            /múltiples verticales/i
+          ];
+          
+          // Contar cuántos patrones genéricos aparecen
+          const matchesGenericos = patronesGenericos.filter(p => p.test(razonText)).length;
+          
+          // Detectar si menciona nombres específicos (empresas, tecnologías, lugares)
+          const tieneNombresEspecificos = /(?:empresa|startup|tecnología|producto|proyecto|planta|instalación|país|ciudad|región|empresas como|tecnologías como|proyectos como|startups como)/i.test(razonText);
+          
+          // Detectar si menciona métricas o números específicos
+          const tieneMetricas = /(?:\d+%|\d+\s*(?:millones?|miles?|euros?|dólares?|toneladas?|MW|GW|kWh|CO2|emisiones)|rango|reducción de|inversión de)/i.test(razonText);
+          
+          // Detectar si menciona tecnologías específicas (no solo términos generales)
+          const tieneTecnologiasEspecificas = /(?:CCS|captura post-combustión|captura pre-combustión|electrólisis|hidrólisis|baterías de|paneles|turbinas|reactores|filtros|membranas|algoritmos|modelos|sistemas de)/i.test(razonText);
+          
+          // Si tiene muchos patrones genéricos Y no tiene detalles específicos, es genérica
+          if (matchesGenericos >= 2 && !tieneNombresEspecificos && !tieneMetricas) {
+            return true;
+          }
+          
+          // Si el score es bajo (genérico según el prompt), rechazar
+          if (scoreValue < 41) {
+            return true;
+          }
+          
+          // Si no tiene al menos 2 de: nombres específicos, métricas, tecnologías específicas
+          const detallesEspecificos = [tieneNombresEspecificos, tieneMetricas, tieneTecnologiasEspecificas].filter(Boolean).length;
+          if (detallesEspecificos < 2 && scoreValue < 60) {
+            return true;
+          }
+          
+          return false;
+        };
+        
         if (relacionado) {
-          relacionados.push({ ...nl, puntuacion: isNaN(score) ? undefined : Math.round(score), analisisRelacion: razon, Relacionado: true });
-          console.log(`✅ Relacionado (score=${isNaN(score) ? 'N/D' : Math.round(score)}): ${razon}`);
+          // Validar si es genérica antes de agregar
+          const esGenerica = esRelacionGenerica(razon, score);
+          
+          if (esGenerica) {
+            console.log(`⚠️ Relación genérica detectada y rechazada (score=${Math.round(score)}): ${razon.substring(0, 100)}...`);
+            noRelacionRazones.push(`Relación genérica rechazada: ${razon.substring(0, 150)}`);
+          } else {
+            relacionados.push({ ...nl, puntuacion: isNaN(score) ? undefined : Math.round(score), analisisRelacion: razon, Relacionado: true });
+            console.log(`✅ Relacionado (score=${isNaN(score) ? 'N/D' : Math.round(score)}): ${razon.substring(0, 150)}...`);
+          }
         } else {
           noRelacionRazones.push(razon || 'No comparten tema/entidades clave.');
           console.log(`❌ No relacionado: ${razon || 'Sin motivo'}`);
@@ -1361,7 +1455,18 @@ export async function compararConNewslettersLocal(resumenNoticia, newsletters, u
       }
     }
 
-    const topRelacionados = relacionados
+    // Filtrar relaciones con score muy bajo (probablemente genéricas que pasaron el filtro)
+    const relacionadosFiltrados = relacionados.filter(r => {
+      const score = typeof r.puntuacion === 'number' ? r.puntuacion : 0;
+      // Solo mantener relaciones con score >= 50 (moderado o mejor)
+      if (score < 50) {
+        console.log(`⚠️ Relación con score bajo rechazada (score=${score}): ${r.titulo}`);
+        return false;
+      }
+      return true;
+    });
+    
+    const topRelacionados = relacionadosFiltrados
       .sort((a, b) => (typeof b.puntuacion === 'number' ? b.puntuacion : -1) - (typeof a.puntuacion === 'number' ? a.puntuacion : -1))
       .slice(0, 3);
 
