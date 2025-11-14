@@ -824,9 +824,9 @@ async function explicarRelacionIA(noticia, newsletter) {
     const resp = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "Eres un analista que encuentra similitudes." },
+        { role: "system", content: "Eres un analista experto que encuentra similitudes específicas y detalladas entre textos. Tu explicación debe ser concreta, mencionando nombres de empresas, tecnologías, lugares, temas específicos compartidos, aspectos técnicos o de negocio que los conectan, y por qué la relación es relevante. Evita generalidades." },
         { role: "user", content: `Noticia:\n${noticia}\n\nNewsletter:\n${newsletter}\n\n
-           Explica en 3 frases por qué están relacionados.` }
+           Proporciona una explicación DETALLADA y ESPECÍFICA de 4 a 8 oraciones sobre por qué están relacionados. Incluye: 1) Nombres concretos de empresas, tecnologías, productos o lugares mencionados en ambos textos, 2) Temas específicos que comparten, 3) Aspectos técnicos o de negocio que los conectan, 4) Contexto o implicaciones específicas de la relación, 5) Por qué esta relación es relevante. Evita explicaciones genéricas.` }
       ]
     });
     return { explicacion: resp?.choices?.[0]?.message?.content?.trim?.() || "" };
@@ -836,9 +836,9 @@ async function explicarRelacionIA(noticia, newsletter) {
         const resp2 = await insecureClient.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
-            { role: "system", content: "Eres un analista que encuentra similitudes." },
+            { role: "system", content: "Eres un analista experto que encuentra similitudes específicas y detalladas entre textos. Tu explicación debe ser concreta, mencionando nombres de empresas, tecnologías, lugares, temas específicos compartidos, aspectos técnicos o de negocio que los conectan, y por qué la relación es relevante. Evita generalidades." },
             { role: "user", content: `Noticia:\n${noticia}\n\nNewsletter:\n${newsletter}\n\n
-            Explica en 3 frases por qué están relacionados.` }
+            Proporciona una explicación DETALLADA y ESPECÍFICA de 4 a 8 oraciones sobre por qué están relacionados. Incluye: 1) Nombres concretos de empresas, tecnologías, productos o lugares mencionados en ambos textos, 2) Temas específicos que comparten, 3) Aspectos técnicos o de negocio que los conectan, 4) Contexto o implicaciones específicas de la relación, 5) Por qué esta relación es relevante. Evita explicaciones genéricas.` }
           ]
         });
         return { explicacion: resp2?.choices?.[0]?.message?.content?.trim?.() || "" };
@@ -1114,7 +1114,7 @@ export async function compararConNewslettersLocal(resumenNoticia, newsletters, u
         }
       } catch {}
 
-      const prompt = `Debes decidir si el resumen de una noticia está relacionado con el resumen de un newsletter. Responde SOLO con JSON válido con estas claves: relacionado (\"SI\" o \"NO\"), razon (explicación específica y personalizada de 3 a 6 oraciones, mencionando entidades/temas/indicadores concretos y por qué encajan o no), score (0-100, opcional).${feedbackHints}\n\nResumen de noticia:\n${resumen}\n\nNewsletter:\n${textoDoc}`;
+      const prompt = `Debes decidir si el resumen de una noticia está relacionado con el resumen de un newsletter. Responde SOLO con JSON válido con estas claves: relacionado (\"SI\" o \"NO\"), razon (explicación DETALLADA y ESPECÍFICA de 4 a 8 oraciones que incluya: 1) Nombres concretos de empresas, tecnologías, productos o lugares mencionados en ambos textos, 2) Temas específicos que comparten (ej: "ambos tratan sobre captura de carbono en la industria siderúrgica"), 3) Aspectos técnicos o de negocio que los conectan, 4) Contexto o implicaciones específicas de la relación, 5) Por qué esta relación es relevante. Evita explicaciones genéricas como "ambos hablan de energía" - sé específico mencionando qué tipo de energía, qué tecnología, qué empresa, etc.), score (0-100, opcional).${feedbackHints}\n\nResumen de noticia:\n${resumen}\n\nNewsletter:\n${textoDoc}`;
 
       try {
         console.log(`\n🧪 [EVALUACIÓN IA] Evaluando newsletter ${i + 1}/${newslettersFiltrados.length} para esta noticia: ${nl.titulo || 'Sin título'}`);
@@ -1131,7 +1131,7 @@ export async function compararConNewslettersLocal(resumenNoticia, newsletters, u
           } catch {}
         }
         const content = await chatCompletionJSON([
-          { role: "system", content: "Responde solo con JSON válido. Ejemplo: {\\\"relacionado\\\":\\\"SI\\\",\\\"razon\\\":\\\"Comparten tema de energía solar\\\",\\\"score\\\":82}" },
+          { role: "system", content: "Responde solo con JSON válido. La explicación en 'razon' debe ser DETALLADA y ESPECÍFICA, mencionando nombres concretos de empresas, tecnologías, lugares, temas específicos compartidos, aspectos técnicos o de negocio que los conectan, y por qué la relación es relevante. Evita generalidades. Ejemplo: {\\\"relacionado\\\":\\\"SI\\\",\\\"razon\\\":\\\"Ambos textos tratan sobre la implementación de sistemas de captura de carbono en plantas siderúrgicas. La noticia menciona específicamente a la empresa ArcelorMittal y su proyecto en Gijón, mientras que el newsletter analiza tecnologías de captura post-combustión aplicadas a la industria del acero. Ambos destacan el potencial de reducir emisiones de CO2 en un 30-40% mediante estas tecnologías y mencionan los desafíos de costos y escalabilidad. La relación es relevante porque conecta un caso específico de implementación con un análisis más amplio del sector.\\\",\\\"score\\\":85}" },
           { role: "user", content: prompt }
         ]);
         console.log(`🔎 Respuesta RAW del modelo: ${content}`);
