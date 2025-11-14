@@ -26,7 +26,8 @@ const query = `(
 
 
 const sortBy = 'relevancy';
-const language = 'es';
+// Buscar en ambos idiomas: español e inglés
+const languages = ['es', 'en'];
 // Palabras clave para filtrar temática - ampliadas para climatech, medio ambiente y startups
 const TOPIC_KEYWORDS = [
   // Términos trending en climatech
@@ -229,8 +230,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const noticiasFilePath = path.join(__dirname, 'noticias.json');
 
-// maxResults: máximo de resultados a devolver (1..100). Por defecto 3
-async function buscarNoticias(maxResults = 3) { // limitado a 3 noticias máximo
+// maxResults: máximo de resultados a devolver (1..100). Por defecto 5 (aumentado para incluir inglés)
+async function buscarNoticias(maxResults = 5) { // aumentado a 5 para incluir noticias en inglés
   try {
     // Cargar dominios desde la base de datos (con fallback dentro del service)
     const fuentesSvc = new FuentesService();
@@ -238,34 +239,78 @@ async function buscarNoticias(maxResults = 3) { // limitado a 3 noticias máximo
     // Calcular el rango de fechas en cada ejecución (ventana móvil)
     const fechaActual = new Date();
     const fromDate = restarDias(fechaActual, 30);
-    const pageSize = Math.min(Math.max(parseInt(maxResults, 10) || 3, 1), 100);
+    const pageSize = Math.min(Math.max(parseInt(maxResults, 10) || 5, 1), 100);
     const fromDateISO = (fromDate instanceof Date ? fromDate : new Date(fromDate))
       .toISOString()
       .split('T')[0]; // usar solo la fecha para mayor compatibilidad
 
+    // Buscar noticias en ambos idiomas: español e inglés
+    const allArticles = [];
     
-    const url = `https://newsapi.org/v2/everything?` +
-      `q=${encodeURIComponent(query.replace(/\s+/g, ' '))}` +
-      `&searchIn=title,description,content` +
-      `&from=${fromDate}` +
-      `&language=${language}` +
-      `&sortBy=${sortBy}` +
-      `&pageSize=${pageSize}` +
-      `&page=1` +
-      // Restringir a dominios confiables desde la propia API
-      `&domains=${encodeURIComponent((trustedDomains || []).join(','))}` +
-      `&apiKey=${API_KEY}`;
+    for (const language of languages) {
+      try {
+        console.log(`🔍 Buscando noticias en ${language === 'es' ? 'español' : 'inglés'}...`);
+        
+        const url = `https://newsapi.org/v2/everything?` +
+          `q=${encodeURIComponent(query.replace(/\s+/g, ' '))}` +
+          `&searchIn=title,description,content` +
+          `&from=${fromDate}` +
+          `&language=${language}` +
+          `&sortBy=${sortBy}` +
+          `&pageSize=${Math.ceil(pageSize / languages.length)}` + // Dividir el tamaño de página entre idiomas
+          `&page=1` +
+          // Restringir a dominios confiables desde la propia API
+          `&domains=${encodeURIComponent((trustedDomains || []).join(','))}` +
+          `&apiKey=${API_KEY}`;
 
-    const res = await fetch(url);
-    const data = await res.json();
+        const res = await fetch(url);
+        const data = await res.json();
 
-    if (data.status !== "ok") {
-      console.error("❌ Error al buscar noticias:", data);
-      return;
+        if (data.status === "ok" && Array.isArray(data.articles)) {
+          allArticles.push(...data.articles);
+          console.log(`✅ Encontradas ${data.articles.length} noticias en ${language === 'es' ? 'español' : 'inglés'}`);
+        } else {
+          console.warn(`⚠️ Error o sin resultados para idioma ${language}:`, data.message || 'Sin datos');
+        }
+        
+        // Pequeña pausa entre requests para evitar rate limiting
+        if (language !== languages[languages.length - 1]) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (langError) {
+        console.error(`❌ Error buscando noticias en ${language}:`, langError?.message || langError);
+      }
+    }
+    
+    // Si no hay resultados de las búsquedas por idioma, intentar sin restricción de idioma
+    if (allArticles.length === 0) {
+      console.log(`🔄 No se encontraron resultados con restricción de idioma, intentando sin restricción...`);
+      try {
+        const url = `https://newsapi.org/v2/everything?` +
+          `q=${encodeURIComponent(query.replace(/\s+/g, ' '))}` +
+          `&searchIn=title,description,content` +
+          `&from=${fromDate}` +
+          `&sortBy=${sortBy}` +
+          `&pageSize=${pageSize}` +
+          `&page=1` +
+          `&domains=${encodeURIComponent((trustedDomains || []).join(','))}` +
+          `&apiKey=${API_KEY}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        if (data.status === "ok" && Array.isArray(data.articles)) {
+          allArticles.push(...data.articles);
+          console.log(`✅ Encontradas ${data.articles.length} noticias sin restricción de idioma`);
+        }
+      } catch (fallbackError) {
+        console.error(`❌ Error en búsqueda sin restricción de idioma:`, fallbackError?.message || fallbackError);
+      }
     }
 
-
-    const allArticles = (data.articles || []);
+    // allArticles ya está poblado desde las búsquedas por idioma
+    console.log(`📊 Total de noticias encontradas: ${allArticles.length} (en ${languages.length} idiomas)`);
+    
     // Filtrado adicional por dominio confiable (estricto)
     let filtered = allArticles.filter(a => {
       try {
@@ -430,8 +475,8 @@ if (process.argv[1] && process.argv[1].includes('buscarNoticias.mjs')) {
     console.log('🔄 Ejecutando búsqueda una sola vez...');
     ejecutarUnaVez(limit);
   } else {
-    // Para GitHub Actions, ejecutar una sola vez con límite reducido
+    // Para GitHub Actions, ejecutar una sola vez con límite aumentado para incluir inglés
     console.log('🤖 Ejecutando en modo GitHub Actions (una sola vez)...');
-    ejecutarUnaVez(limit || 3); // Limitar a 3 noticias máximo para GitHub Actions
+    ejecutarUnaVez(limit || 5); // Aumentado a 5 noticias para incluir inglés
   }
 }

@@ -22,6 +22,76 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/Newsletter/ayuda
+// Endpoint de ayuda que explica cómo funcionan los Newsletters
+router.get('/ayuda', async (req, res) => {
+  try {
+    res.status(200).json({
+      titulo: 'Cómo funcionan los Newsletters',
+      descripcion: 'Los newsletters son publicaciones de Pulso by Antom que el sistema utiliza para relacionar con noticias sobre climatech.',
+      comoFunciona: {
+        agregar: {
+          metodo: 'POST /api/Newsletter',
+          descripcion: 'Puedes agregar nuevos newsletters enviando un POST con el campo "link" (debe ser de pulsobyantom.substack.com).',
+          ejemplo: {
+            body: {
+              link: 'https://pulsobyantom.substack.com/p/titulo-del-newsletter'
+            }
+          },
+          nota: 'El sistema extraerá automáticamente el título y generará un resumen del newsletter.'
+        },
+        importar: {
+          metodo: 'POST /api/Newsletter/import',
+          descripcion: 'Importa un newsletter desde Substack, extrayendo contenido y generando resumen automáticamente.',
+          ejemplo: {
+            body: {
+              link: 'https://pulsobyantom.substack.com/p/titulo',
+              titulo: 'Título opcional'
+            }
+          }
+        },
+        importarRapido: {
+          metodo: 'POST /api/Newsletter/import-fast',
+          descripcion: 'Versión rápida que solo extrae y resume, sin clasificar ni comparar.',
+          nota: 'Útil para actualizar resúmenes de newsletters existentes.'
+        },
+        listar: {
+          metodo: 'GET /api/Newsletter',
+          descripcion: 'Obtiene todos los newsletters registrados en el sistema.',
+          respuesta: 'Array de objetos con { id, link, titulo, Resumen, fecha_creacion }'
+        },
+        eliminar: {
+          metodo: 'DELETE /api/Newsletter/:id',
+          descripcion: 'Elimina un newsletter del sistema por ID.'
+        }
+      },
+      relacionConNoticias: {
+        proceso: 'Cuando se analiza una noticia, el sistema compara automáticamente su contenido con todos los newsletters registrados.',
+        criterios: 'Se buscan coincidencias temáticas, palabras clave relacionadas con climatech, y similitudes semánticas.',
+        resultado: 'Si encuentra relación, se crea un "Trend" que vincula la noticia con el newsletter relacionado.',
+        explicacion: 'Cada relación incluye una explicación detallada de por qué están relacionados, mencionando empresas, tecnologías y temas específicos.'
+      },
+      analisis: {
+        metodo: 'POST /api/Newsletter/analizar',
+        descripcion: 'Analiza una noticia (URL) y busca newsletters relacionados automáticamente.',
+        ejemplo: {
+          body: {
+            input: 'https://ejemplo.com/noticia-climatech'
+          }
+        },
+        respuesta: {
+          esClimatech: 'boolean - Si la noticia es sobre climatech',
+          newslettersRelacionados: 'Array de newsletters relacionados con explicaciones detalladas',
+          inserts: 'Array de trends creados en la base de datos'
+        }
+      }
+    });
+  } catch (e) {
+    console.error('Error en endpoint de ayuda:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 // Endpoint para obtener un newsletter por ID
 router.get('/:id', async (req, res) => {
   try {

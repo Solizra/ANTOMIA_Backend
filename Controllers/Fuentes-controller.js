@@ -60,6 +60,59 @@ router.delete('/', async (req, res) => {
   }
 });
 
+// GET /api/Fuentes/ayuda
+// Endpoint de ayuda que explica cómo funcionan las Fuentes
+router.get('/ayuda', async (req, res) => {
+  try {
+    res.status(200).json({
+      titulo: 'Cómo funcionan las Fuentes',
+      descripcion: 'Las fuentes son dominios de sitios web de noticias que el sistema utiliza para buscar y procesar noticias sobre climatech.',
+      comoFunciona: {
+        agregar: {
+          metodo: 'POST /api/Fuentes',
+          descripcion: 'Puedes agregar nuevas fuentes enviando un POST con el campo "fuente" (o "dominio") y opcionalmente "categoria".',
+          ejemplo: {
+            body: {
+              fuente: 'techcrunch.com',
+              categoria: 'Tecnología'
+            }
+          },
+          nota: 'Si la fuente ya existe, recibirás un mensaje indicándolo. El sistema buscará noticias de todas las fuentes activas.'
+        },
+        listar: {
+          metodo: 'GET /api/Fuentes',
+          descripcion: 'Obtiene todas las fuentes registradas en el sistema.',
+          respuesta: 'Array de objetos con { fuente, categoria, activo, id }'
+        },
+        eliminar: {
+          metodo: 'DELETE /api/Fuentes?dominio=example.com',
+          descripcion: 'Elimina (desactiva) una fuente del sistema.',
+          nota: 'Una vez eliminada, el sistema dejará de buscar noticias de esa fuente.'
+        }
+      },
+      procesamiento: {
+        automatico: 'El sistema busca noticias automáticamente de todas las fuentes activas en español e inglés.',
+        frecuencia: 'Las búsquedas se ejecutan periódicamente (configurado en GitHub Actions o cron).',
+        filtrado: 'Solo se procesan noticias relacionadas con climatech, medio ambiente y sostenibilidad.',
+        traduccion: 'Las noticias en inglés se traducen automáticamente al español antes de ser procesadas.'
+      },
+      fuentesRecomendadas: [
+        'techcrunch.com - Tecnología y startups',
+        'wired.com - Tecnología e innovación',
+        'reuters.com - Noticias generales confiables',
+        'bloomberg.com - Finanzas y negocios',
+        'cleantechnica.com - Especializado en cleantech',
+        'carbonbrief.org - Cambio climático',
+        'elpais.com - Noticias en español',
+        'elconfidencial.com - Noticias en español'
+      ]
+    });
+  } catch (e) {
+    console.error('Error en endpoint de ayuda:', e);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 export default router;
 
 
