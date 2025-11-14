@@ -771,7 +771,53 @@ async function esClimatechIA(contenido) {
     });
     const salida = resp?.choices?.[0]?.message?.content?.trim?.() || "";
     console.log(`[esClimatechIA] Respuesta RAW del modelo: ${salida}`);
-    const esClimatech = salida.toLowerCase().startsWith("si");
+    // Detectar si es climatech de forma más robusta
+    const salidaLower = salida.toLowerCase().trim();
+    // Normalizar: quitar acentos para comparación
+    const salidaNormalizada = salidaLower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    
+    // Verificar múltiples patrones que indican "SÍ es climatech"
+    const patronesPositivos = [
+      /^si[\s.,:;!?]/i,  // Empieza con "si" seguido de puntuación/espacio
+      /^si\b/i,          // Empieza con "si" como palabra completa
+      /\bes climatech\b/i,  // Contiene "es climatech"
+      /\best[aá] relacionada con climatech/i,  // "está relacionada con climatech"
+      /\best[aá] relacionada.*climatech/i,  // "está relacionada... climatech"
+      /\bsi.*climatech/i,  // "si... climatech" en cualquier parte
+      /\besta noticia.*si.*relacionada/i,  // "esta noticia... sí... relacionada"
+    ];
+    
+    // Verificar patrones negativos que indican claramente "NO"
+    const patronesNegativos = [
+      /^no[\s.,:;!?]/i,  // Empieza con "no"
+      /\bno es climatech/i,  // "no es climatech"
+      /\bno.*relacionada.*climatech/i,  // "no... relacionada... climatech"
+    ];
+    
+    // Si hay un patrón negativo claro, es NO
+    const tieneNegativo = patronesNegativos.some(patron => patron.test(salidaNormalizada));
+    if (tieneNegativo) {
+      console.log(`[esClimatechIA] Patrón negativo detectado: NO es Climatech`);
+      return { esClimatech: false, razon: salida };
+    }
+    
+    // Si hay un patrón positivo, es SÍ
+    const tienePositivo = patronesPositivos.some(patron => patron.test(salidaNormalizada));
+    
+    // Fallback: si no hay patrón claro pero la respuesta contiene indicadores positivos de climatech
+    // (evitando falsos positivos con palabras como "no es climatech")
+    const tieneIndicadoresPositivos = !tienePositivo && (
+      (salidaNormalizada.includes("climatech") && !salidaNormalizada.includes("no es climatech")) ||
+      (salidaNormalizada.includes("relacionada") && salidaNormalizada.includes("climatech") && !salidaNormalizada.includes("no")) ||
+      (salidaNormalizada.includes("si") && salidaNormalizada.includes("relacionada") && salidaNormalizada.length < 200)
+    );
+    
+    const esClimatech = tienePositivo || tieneIndicadoresPositivos;
+    
+    if (tieneIndicadoresPositivos) {
+      console.log(`[esClimatechIA] Indicadores positivos detectados (fallback): SÍ es Climatech`);
+    }
+    
     console.log(`[esClimatechIA] Decisión calculada: ${esClimatech ? 'SI' : 'NO'}`);
     return { esClimatech, razon: salida };
   } catch (err) {
@@ -805,7 +851,51 @@ async function esClimatechIA(contenido) {
         });
         const salida2 = resp2?.choices?.[0]?.message?.content?.trim?.() || "";
         console.log(`[esClimatechIA] Respuesta RAW del modelo (retry): ${salida2}`);
-        const esClimatech2 = salida2.toLowerCase().startsWith("si");
+        // Detectar si es climatech de forma más robusta
+        const salida2Lower = salida2.toLowerCase().trim();
+        const salida2Normalizada = salida2Lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        
+        // Verificar múltiples patrones que indican "SÍ es climatech"
+        const patronesPositivos2 = [
+          /^si[\s.,:;!?]/i,
+          /^si\b/i,
+          /\bes climatech\b/i,
+          /\best[aá] relacionada con climatech/i,
+          /\best[aá] relacionada.*climatech/i,
+          /\bsi.*climatech/i,
+          /\besta noticia.*si.*relacionada/i,
+        ];
+        
+        // Verificar patrones negativos
+        const patronesNegativos2 = [
+          /^no[\s.,:;!?]/i,
+          /\bno es climatech/i,
+          /\bno.*relacionada.*climatech/i,
+        ];
+        
+        // Si hay un patrón negativo claro, es NO
+        const tieneNegativo2 = patronesNegativos2.some(patron => patron.test(salida2Normalizada));
+        if (tieneNegativo2) {
+          console.log(`[esClimatechIA] Patrón negativo detectado (retry): NO es Climatech`);
+          return { esClimatech: false, razon: salida2 };
+        }
+        
+        // Si hay un patrón positivo, es SÍ
+        const tienePositivo2 = patronesPositivos2.some(patron => patron.test(salida2Normalizada));
+        
+        // Fallback: si no hay patrón claro pero la respuesta contiene indicadores positivos de climatech
+        const tieneIndicadoresPositivos2 = !tienePositivo2 && (
+          (salida2Normalizada.includes("climatech") && !salida2Normalizada.includes("no es climatech")) ||
+          (salida2Normalizada.includes("relacionada") && salida2Normalizada.includes("climatech") && !salida2Normalizada.includes("no")) ||
+          (salida2Normalizada.includes("si") && salida2Normalizada.includes("relacionada") && salida2Normalizada.length < 200)
+        );
+        
+        const esClimatech2 = tienePositivo2 || tieneIndicadoresPositivos2;
+        
+        if (tieneIndicadoresPositivos2) {
+          console.log(`[esClimatechIA] Indicadores positivos detectados (retry, fallback): SÍ es Climatech`);
+        }
+        
         console.log(`[esClimatechIA] Decisión calculada (retry): ${esClimatech2 ? 'SI' : 'NO'}`);
         return { esClimatech: esClimatech2, razon: salida2 };
       } catch (err2) {
