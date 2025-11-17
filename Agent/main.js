@@ -1175,7 +1175,7 @@ function filtrarNewslettersPorPalabrasClave(resumenNoticia, newsletters, opcione
 
     const resumen = typeof resumenNoticia === 'string' ? resumenNoticia : String(resumenNoticia || '');
     const resumenNormalizado = removeDiacritics(resumen.toLowerCase());
-    const limite = Math.max(1, Math.min(Number(opciones?.limiteTop) || 15, 50)); // Reducido de 20 a 15, máximo 50
+    const limite = Math.max(1, Math.min(Number(opciones?.limiteTop) || 8, 30));
     
     // Extraer tokens del resumen de la noticia
     const tokensNoticia = tokenize(resumen);
@@ -1193,9 +1193,8 @@ function filtrarNewslettersPorPalabrasClave(resumenNoticia, newsletters, opcione
       const tokensNewsletter = tokenize(textoNewsletter);
       const tokensNewsletterSet = new Set(tokensNewsletter);
       
-      // Calcular coincidencias de tokens (solo tokens significativos, no stopwords)
       const coincidenciasTokens = [...tokensNoticiaSet].filter(token => 
-        tokensNewsletterSet.has(token) && token.length > 3 // Solo tokens de más de 3 caracteres
+        tokensNewsletterSet.has(token) && token.length > 3
       );
       
       // Calcular coincidencias de palabras clave específicas de climatech
@@ -1213,47 +1212,28 @@ function filtrarNewslettersPorPalabrasClave(resumenNoticia, newsletters, opcione
         }
       }
       
-      // Calcular score de similitud usando Jaccard
-      const similitudJaccard = jaccard(tokensNoticiaSet, tokensNewsletterSet);
-      
-      // Score compuesto más estricto
-      const scoreFiltro = (
-        coincidenciasTokens.length * 1.5 +       // Aumentado peso de tokens (1.0 -> 1.5)
-        coincidenciasClave * 4.0 +               // Aumentado peso de keywords (2.5 -> 4.0)
-        (similitudJaccard * 100) * 1.0           // Aumentado peso de Jaccard (0.6 -> 1.0)
-      );
-
-      // CRITERIOS MÁS ESTRICTOS: Requerir múltiples condiciones
-      // Opción 1: Al menos 8 tokens coincidentes Y al menos 2 keywords climatech
-      // Opción 2: Al menos 12 tokens coincidentes (sin keywords)
-      // Opción 3: Al menos 3 keywords climatech (sin importar tokens)
-      // Opción 4: Score total muy alto (>= 30) con al menos alguna coincidencia
-      const condicion1 = coincidenciasTokens.length >= 8 && coincidenciasClave >= 2;
-      const condicion2 = coincidenciasTokens.length >= 11 && coincidenciasClave >= 1;
-      const condicion3 = scoreFiltro >= 23 && (coincidenciasTokens.length >= 7 || coincidenciasClave >= 1);
-      
-      // Además, requerir un mínimo de similitud Jaccard razonable
-      const jaccardMinimo = similitudJaccard >= 0.04; // Aumentado de 0.09 (implícito) a 0.12
-      
-      const esCandidato = (condicion1 || condicion2 || condicion3) && jaccardMinimo;
+      const condicionTokensKeywords = coincidenciasTokens.length >= 10 && coincidenciasClave >= 2;
+      const condicionSoloTokens = coincidenciasTokens.length >= 14;
+      const condicionSoloKeywords = coincidenciasClave >= 4;
+      const esCandidato = condicionTokensKeywords || condicionSoloTokens || condicionSoloKeywords;
 
       if (esCandidato) {
+        const ranking = coincidenciasClave * 100 + coincidenciasTokens;
         candidatos.push({
           ...newsletter,
           _scoreFiltro: {
             coincidenciasTokens: coincidenciasTokens.length,
             coincidenciasClave,
-            similitudJaccard: Math.round(similitudJaccard * 100) / 100,
-            score: Math.round(scoreFiltro),
+            score: ranking,
             keywordsEncontrados: keywordsEncontrados.slice(0, 5) // Limitar a 5 para logging
           }
         });
 
-        console.log(`✅ Candidato: ${newsletter.titulo} (score: ${Math.round(scoreFiltro)}, tokens: ${coincidenciasTokens.length}, claves: ${coincidenciasClave}, jaccard: ${Math.round(similitudJaccard * 100) / 100}, keywords: ${keywordsEncontrados.slice(0, 3).join(', ')})`);
+        console.log(`✅ Candidato: ${newsletter.titulo} (tokens: ${coincidenciasTokens.length}, claves: ${coincidenciasClave}, keywords: ${keywordsEncontrados.slice(0, 3).join(', ')})`);
       } else {
         // Solo loggear si está cerca de pasar (para debugging)
-        if (coincidenciasTokens.length >= 5 || coincidenciasClave >= 1) {
-          console.log(`❌ Newsletter descartado (filtro estricto): ${newsletter.titulo} (tokens: ${coincidenciasTokens.length}, claves: ${coincidenciasClave}, jaccard: ${Math.round(similitudJaccard * 100) / 100}, score: ${Math.round(scoreFiltro)})`);
+        if (coincidenciasTokens.length >= 6 || coincidenciasClave >= 1) {
+          console.log(`❌ Newsletter descartado: ${newsletter.titulo} (tokens: ${coincidenciasTokens.length}, claves: ${coincidenciasClave})`);
         }
       }
     }
@@ -1262,7 +1242,7 @@ function filtrarNewslettersPorPalabrasClave(resumenNoticia, newsletters, opcione
     const ordenados = candidatos.sort((a,b) => (b?._scoreFiltro?.score || 0) - (a?._scoreFiltro?.score || 0));
     const top = ordenados.slice(0, limite);
 
-    console.log(`📊 [FILTRO POR NOTICIA] Seleccionados top ${top.length}/${newsletters.length} newsletters (límite=${limite}) para análisis IA (filtro estricto aplicado)`);
+    console.log(`📊 [FILTRO POR NOTICIA] Seleccionados top ${top.length}/${newsletters.length} newsletters (límite=${limite}) para análisis IA (filtro simplificado)`);
     return top;
     
   } catch (error) {
@@ -1283,7 +1263,7 @@ export async function compararConNewslettersLocal(resumenNoticia, newsletters, u
     }
 
     // APLICAR FILTRO DE PALABRAS CLAVE ANTES DEL ANÁLISIS DE IA (MÁS ESTRICTO)
-    const newslettersFiltrados = filtrarNewslettersPorPalabrasClave(resumen, newsletters, { limiteTop: 15 });
+    const newslettersFiltrados = filtrarNewslettersPorPalabrasClave(resumen, newsletters, { limiteTop: 8 });
     
     if (newslettersFiltrados.length === 0) {
       console.log(`⚠️ Ningún newsletter pasó el filtro de palabras clave`);
