@@ -1214,13 +1214,13 @@ function filtrarNewslettersPorPalabrasClave(resumenNoticia, newsletters, opcione
       // Opción 2: Al menos 12 tokens coincidentes (sin keywords)
       // Opción 3: Al menos 3 keywords climatech (sin importar tokens)
       // Opción 4: Score total muy alto (>= 30) con al menos alguna coincidencia
-      const condicion1 = coincidenciasTokens.length >= 5 && coincidenciasClave >= 2;
+      const condicion1 = coincidenciasTokens.length >= 6 && coincidenciasClave >= 2;
       const condicion2 = coincidenciasTokens.length >= 9 && coincidenciasClave >= 1;
-      const condicion3 = coincidenciasClave >= 3;
-      const condicion4 = scoreFiltro >= 20 && (coincidenciasTokens.length >= 5 || coincidenciasClave >= 1);
+      const condicion3 = coincidenciasClave >= 4;
+      const condicion4 = scoreFiltro >= 23 && (coincidenciasTokens.length >= 5 || coincidenciasClave >= 1);
       
       // Además, requerir un mínimo de similitud Jaccard razonable
-      const jaccardMinimo = similitudJaccard >= 0.03; // Aumentado de 0.09 (implícito) a 0.12
+      const jaccardMinimo = similitudJaccard >= 0.04; // Aumentado de 0.09 (implícito) a 0.12
       
       const esCandidato = (condicion1 || condicion2 || condicion3 || condicion4) && jaccardMinimo;
 
