@@ -1047,7 +1047,7 @@ async function explicarRelacionIA(noticia, newsletter) {
       messages: [
         { role: "system", content: "Eres un analista experto que encuentra similitudes específicas y detalladas entre textos. Tu explicación debe ser concreta, mencionando nombres de empresas, tecnologías, lugares, temas específicos compartidos, aspectos técnicos o de negocio que los conectan, y por qué la relación es relevante. Evita generalidades." },
         { role: "user", content: `Noticia:\n${noticia}\n\nNewsletter:\n${newsletter}\n\n
-           Proporciona una explicación DETALLADA y ESPECÍFICA de 4 a 8 oraciones sobre por qué están relacionados. Incluye: 1) Nombres concretos de empresas, tecnologías, productos o lugares mencionados en ambos textos, 2) Temas específicos que comparten, 3) Aspectos técnicos o de negocio que los conectan, 4) Contexto o implicaciones específicas de la relación, 5) Por qué esta relación es relevante. Evita explicaciones genéricas.` }
+           Proporciona una explicación DETALLADA y ESPECÍFICA de 4 a 8 oraciones sobre por qué están relacionados. Incluye: 1) Breve explicacion de la noticia 2)Que en especifico nombra que se nombra también en el Newsletter 4)Nombres concretos de empresas, tecnologías, productos o lugares mencionados en ambos textos,  5) Aspectos técnicos o de negocio que los conectan, 6) Contexto o implicaciones específicas de la relación, 7) Por qué esta relación es relevante. Que sea detallado e incluya párrafos separados y coherentes.` }
       ]
     });
     return { explicacion: resp?.choices?.[0]?.message?.content?.trim?.() || "" };
@@ -1455,8 +1455,23 @@ ${textoDoc}`;
             console.log(`⚠️ Relación genérica detectada y rechazada (score=${Math.round(score)}): ${razon.substring(0, 100)}...`);
             noRelacionRazones.push(`Relación genérica rechazada: ${razon.substring(0, 150)}`);
           } else {
-            relacionados.push({ ...nl, puntuacion: isNaN(score) ? undefined : Math.round(score), analisisRelacion: razon, Relacionado: true });
-            console.log(`✅ Relacionado (score=${isNaN(score) ? 'N/D' : Math.round(score)}): ${razon.substring(0, 150)}...`);
+            let explicacionRelacion = razon;
+            try {
+              const explicacionIA = await explicarRelacionIA(resumen, textoDoc);
+              if (explicacionIA?.explicacion) {
+                explicacionRelacion = explicacionIA.explicacion;
+              }
+            } catch (expErr) {
+              console.error('⚠️ Error generando explicación detallada con explicarRelacionIA:', expErr?.message || expErr);
+            }
+            relacionados.push({
+              ...nl,
+              puntuacion: isNaN(score) ? undefined : Math.round(score),
+              analisisRelacion: explicacionRelacion,
+              Relacionado: true,
+              detalleRelacionInicial: razon
+            });
+            console.log(`✅ Relacionado (score=${isNaN(score) ? 'N/D' : Math.round(score)}): ${explicacionRelacion.substring(0, 150)}...`);
           }
         } else {
           noRelacionRazones.push(razon || 'No comparten tema/entidades clave.');
