@@ -790,8 +790,8 @@ async function esClimatechIA(contenido) {
     // Verificar patrones negativos que indican claramente "NO"
     const patronesNegativos = [
       /^no[\s.,:;!?]/i,  // Empieza con "no"
-      /\bno es climatech/i,  // "no es climatech"
-      /\bno.*relacionada.*climatech/i,  // "no... relacionada... climatech"
+      /\bno\b\s+es\s+climatech\b/i,  // "no es climatech"
+      /\bno\b.*\brelacionad[ao]s?.*climatech/i,  // "no... relacionada... climatech"
     ];
     
     // Si hay un patrón negativo claro, es NO
@@ -806,10 +806,17 @@ async function esClimatechIA(contenido) {
     
     // Fallback: si no hay patrón claro pero la respuesta contiene indicadores positivos de climatech
     // (evitando falsos positivos con palabras como "no es climatech")
+    const contienePalabra = (texto, palabra) => {
+      if (!palabra) return false;
+      const escaped = palabra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+      return regex.test(texto);
+    };
+    const contienePalabraNo = contienePalabra(salidaNormalizada, 'no');
     const tieneIndicadoresPositivos = !tienePositivo && (
       (salidaNormalizada.includes("climatech") && !salidaNormalizada.includes("no es climatech")) ||
-      (salidaNormalizada.includes("relacionada") && salidaNormalizada.includes("climatech") && !salidaNormalizada.includes("no")) ||
-      (salidaNormalizada.includes("si") && salidaNormalizada.includes("relacionada") && salidaNormalizada.length < 200)
+      (salidaNormalizada.includes("relacionada") && salidaNormalizada.includes("climatech") && !contienePalabraNo) ||
+      (contienePalabra(salidaNormalizada, "si") && salidaNormalizada.includes("relacionada") && salidaNormalizada.length < 200)
     );
     
     const esClimatech = tienePositivo || tieneIndicadoresPositivos;
@@ -869,8 +876,8 @@ async function esClimatechIA(contenido) {
         // Verificar patrones negativos
         const patronesNegativos2 = [
           /^no[\s.,:;!?]/i,
-          /\bno es climatech/i,
-          /\bno.*relacionada.*climatech/i,
+          /\bno\b\s+es\s+climatech\b/i,
+          /\bno\b.*\brelacionad[ao]s?.*climatech/i,
         ];
         
         // Si hay un patrón negativo claro, es NO
@@ -884,10 +891,17 @@ async function esClimatechIA(contenido) {
         const tienePositivo2 = patronesPositivos2.some(patron => patron.test(salida2Normalizada));
         
         // Fallback: si no hay patrón claro pero la respuesta contiene indicadores positivos de climatech
+        const contienePalabra2 = (texto, palabra) => {
+          if (!palabra) return false;
+          const escaped = palabra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+          return regex.test(texto);
+        };
+        const contienePalabraNo2 = contienePalabra2(salida2Normalizada, 'no');
         const tieneIndicadoresPositivos2 = !tienePositivo2 && (
           (salida2Normalizada.includes("climatech") && !salida2Normalizada.includes("no es climatech")) ||
-          (salida2Normalizada.includes("relacionada") && salida2Normalizada.includes("climatech") && !salida2Normalizada.includes("no")) ||
-          (salida2Normalizada.includes("si") && salida2Normalizada.includes("relacionada") && salida2Normalizada.length < 200)
+          (salida2Normalizada.includes("relacionada") && salida2Normalizada.includes("climatech") && !contienePalabraNo2) ||
+          (contienePalabra2(salida2Normalizada, "si") && salida2Normalizada.includes("relacionada") && salida2Normalizada.length < 200)
         );
         
         const esClimatech2 = tienePositivo2 || tieneIndicadoresPositivos2;
