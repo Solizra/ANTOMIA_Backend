@@ -1175,7 +1175,7 @@ function filtrarNewslettersPorPalabrasClave(resumenNoticia, newsletters, opcione
 
     const resumen = typeof resumenNoticia === 'string' ? resumenNoticia : String(resumenNoticia || '');
     const resumenNormalizado = removeDiacritics(resumen.toLowerCase());
-    const limite = Math.max(1, Math.min(Number(opciones?.limiteTop) || 8, 30));
+    const limite = Math.max(1, Math.min(Number(opciones?.limiteTop) || 15, 30));
     
     // Extraer tokens del resumen de la noticia
     const tokensNoticia = tokenize(resumen);
@@ -1212,10 +1212,9 @@ function filtrarNewslettersPorPalabrasClave(resumenNoticia, newsletters, opcione
         }
       }
       
-      const condicionTokensKeywords = coincidenciasTokens.length >= 10 && coincidenciasClave >= 2;
-      const condicionSoloTokens = coincidenciasTokens.length >= 14;
-      const condicionSoloKeywords = coincidenciasClave >= 4;
-      const esCandidato = condicionTokensKeywords || condicionSoloTokens || condicionSoloKeywords;
+      const condicionTokensKeywords = coincidenciasTokens.length >= 15 && coincidenciasClave >= 2;
+      const condicionSoloTokens = coincidenciasTokens.length >= 20;
+      const esCandidato = condicionTokensKeywords || condicionSoloTokens;
 
       if (esCandidato) {
         const ranking = coincidenciasClave * 100 + coincidenciasTokens;
