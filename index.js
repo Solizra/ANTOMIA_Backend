@@ -1,7 +1,5 @@
 import 'dotenv/config';
-import Server from './app/core/Server.js';
 
-HEAD
 const defaultAllowedOrigins = [
   'https://solizra.github.io',
   'https://antom.la',
@@ -588,7 +586,3 @@ app.listen(port, async () => {
     console.error('Error iniciando la búsqueda de noticias:', e);
   }
 });
-
-const server = new Server();
-server.start();
-
