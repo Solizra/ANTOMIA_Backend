@@ -1477,8 +1477,13 @@ ${textoDoc}`;
       .sort((a, b) => (typeof b.puntuacion === 'number' ? b.puntuacion : -1) - (typeof a.puntuacion === 'number' ? a.puntuacion : -1))
       .slice(0, 3);
 
+    const resumenNormalizado = resumen?.trim() || '';
+    const resumenParaMotivo = resumenNormalizado.length > 400
+      ? `${resumenNormalizado.substring(0, 400).trim()}...`
+      : resumenNormalizado;
+    const motivoBase = noRelacionRazones[0] || 'No hay coincidencias temáticas claras entre la noticia y los newsletters.';
     const motivoSinRelacion = topRelacionados.length === 0
-      ? (noRelacionRazones[0] || 'No hay coincidencias temáticas claras entre la noticia y los newsletters.')
+      ? [motivoBase, resumenParaMotivo ? `📝 Resumen IA: ${resumenParaMotivo}` : null].filter(Boolean).join('\n')
       : '';
 
     console.log(`\n📊 [RESULTADO FINAL POR NOTICIA] Newsletter relacionados encontrados: ${topRelacionados.length}`);
