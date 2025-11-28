@@ -62,7 +62,16 @@ const __dirname = path.dirname(__filename);
 const noticiasFilePath = path.join(__dirname, 'APIs', 'noticias.json');
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', resolveAllowedOrigin(req.headers.origin) || resolvedAllowedOrigins[0] || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, X-Requested-With, Accept');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    return res.sendStatus(204);
+  }
+  next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -607,5 +616,3 @@ app.listen(port, async () => {
     console.error('Error iniciando la búsqueda de noticias:', e);
   }
 });
-const server = new Server();
-server.start();
