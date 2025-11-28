@@ -699,7 +699,7 @@ export async function generarResumenIA(contenido) { //de donde sale el contenido
     
     // No limitar longitud máxima: mantener todo el resumen para comparaciones completas
     console.log(`✅ Resumen inteligente generado: ${resumen.length} caracteres (sin recorte máximo)`);
-    console.log(`📝 Resumen: "${resumen}"`);
+    console.log(` Resumen: "${resumen}"`);
     
     return resumen;
   } catch (error) {
