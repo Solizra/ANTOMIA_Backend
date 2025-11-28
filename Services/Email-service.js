@@ -13,6 +13,14 @@ class EmailService {
   initializeTransporter() {
     try {
       const emailDisabled = String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true';
+      console.log('[EmailService] Inicializando transporter...', {
+        emailDisabled,
+        hasSmtpUrl: Boolean(process.env.EMAIL_SMTP_URL || process.env.SMTP_URL),
+        service: process.env.EMAIL_SERVICE || '',
+        host: process.env.EMAIL_HOST || '',
+        user: process.env.EMAIL_USER ? '[set]' : '[missing]',
+        port: process.env.EMAIL_PORT || '',
+      });
       if (emailDisabled) {
         this.transporter = null;
         console.warn('⚠️ Email deshabilitado: EMAIL_DISABLED habilitado. El sistema continuará sin enviar correos.');
@@ -21,6 +29,7 @@ class EmailService {
 
       const smtpUrl = (process.env.EMAIL_SMTP_URL || process.env.SMTP_URL || '').trim();
       if (smtpUrl) {
+        console.log('[EmailService] Creando transporter usando SMTP URL directa.');
         this.transporter = nodemailer.createTransport(smtpUrl);
         this.verifyTransporter('URL SMTP');
         return;
@@ -62,6 +71,12 @@ class EmailService {
             socketTimeout: 15000
           };
 
+      console.log('[EmailService] Creando transporter usando configuración detallada.', {
+        mode: service ? `service:${service}` : 'custom-host',
+        resolvedHost: transportConfig.host || service,
+        resolvedPort: transportConfig.port || '[by-service]',
+        secure,
+      });
       this.transporter = nodemailer.createTransport(transportConfig);
       this.verifyTransporter(service ? `service:${service}` : host || 'SMTP');
     } catch (error) {
@@ -70,7 +85,11 @@ class EmailService {
   }
 
   verifyTransporter(mode = 'SMTP') {
-    if (!this.transporter) return;
+    if (!this.transporter) {
+      console.warn('✉️ verifyTransporter omitido: transporter inexistente.');
+      return;
+    }
+    console.log(`[EmailService] Verificando transporter (${mode})...`);
     this.transporter.verify().then(() => {
       console.log(`✅ Email service configurado correctamente (${mode})`);
     }).catch((error) => {
@@ -89,7 +108,13 @@ class EmailService {
   // Enviar notificación de nuevo Trend (BCC masivo para eficiencia)
   async sendNewTrendNotification(recipients, trend) {
     try {
+      console.log('[EmailService] Preparando notificación de Trend...', {
+        recipients,
+        trendId: trend?.id,
+        trendTitle: trend?.['Título_del_Trend'] || trend?.Titulo,
+      });
       if (!Array.isArray(recipients) || recipients.length === 0) {
+        console.warn('[EmailService] Notificación omitida: lista de destinatarios vacía.');
         return { skipped: true, reason: 'sin destinatarios' };
       }
 
@@ -155,6 +180,13 @@ class EmailService {
         html,
         text
       };
+
+      console.log('[EmailService] Enviando correo...', {
+        subject,
+        toPlaceholder,
+        bccCount: recipients.length,
+        hasQuickLink: Boolean(quickLink),
+      });
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log(`✅ Notificación de nuevo Trend enviada a ${recipients.length} destinatarios`);
