@@ -11,6 +11,7 @@
 - Configura los destinatarios fijos con la variable `TREND_ALERT_RECIPIENTS` (separados por comas). Si no se define, se usa `sassonindiana@gmail.com` como valor por defecto.
 - Para personalizar el enlace de acceso rápido incluido en el correo puedes definir `TREND_ALERT_PAGE_BASE_URL` y, opcionalmente, `TREND_ALERT_PAGE_PATH` (por defecto `/trends`). Si no se configuran, se intenta construir el enlace con `FRONTEND_URL` y, como último recurso, se usa el link original del trend.
 - Existe la variable `NEW_TREND_QUICK_LINK` si solo necesitas establecer un enlace fijo personalizado (tiene prioridad sobre los demás).
+- Ejemplo: para redirigir siempre al dashboard público coloca `NEW_TREND_QUICK_LINK=https://solizra.github.io/ANTOMIA_Frontend/#/Home` en tu `.env` local y en los secrets del workflow `auto-update`.
 
 ### Configuración SMTP básica
 
