@@ -41,6 +41,7 @@ jobs:
           echo "EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}" >> .env
           echo "EMAIL_FROM=${{ secrets.EMAIL_FROM }}" >> .env
           echo "TREND_ALERT_RECIPIENTS=${{ secrets.TREND_ALERT_RECIPIENTS }}" >> .env
+          echo "NEW_TREND_QUICK_LINK=${{ secrets.NEW_TREND_QUICK_LINK }}" >> .env
 
       - name: Esperar a que el backend esté disponible
         run: |
