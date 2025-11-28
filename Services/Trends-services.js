@@ -8,7 +8,6 @@ export default class TrendsService {
     this.repo = new TrendsRepository();
     this.pool = null;
     // Lazy load to avoid circular deps at import time
-    this._authService = null;
     this._emailService = null;
   }
 
@@ -91,30 +90,12 @@ export default class TrendsService {
       }
       const created = await this.repo.createAsync(payload);
 
-      // Notificar por email a usuarios autenticados (excepto excluidos)
-      try {
-        if (!this._authService) {
-          const { default: AuthService } = await import('./Auth-service.js');
-          this._authService = new AuthService();
-        }
-        if (!this._emailService) {
-          const { default: EmailService } = await import('./Email-service.js');
-          this._emailService = new EmailService();
-        }
-
-        const allEmails = await this._authService.listAllUserEmails();
-        const excluded = new Set(['ruben@antom.la', 'paula@antom.la'].map(e => e.toLowerCase()));
-        const unique = Array.from(new Set(allEmails)).filter(e => !excluded.has(e));
-
-        if (unique.length > 0) {
-          await this._emailService.sendNewTrendNotification(unique, created);
-        } else {
-          console.log('✉️ No hay destinatarios para notificación de Trend (tras exclusiones)');
-        }
-      } catch (notifyErr) {
-        console.warn('⚠️ No se pudo enviar notificación de nuevo Trend:', notifyErr?.message || notifyErr);
+      if (created?.duplicated) {
+        console.log('ℹ️ Trend duplicado detectado. Se omite notificación por correo.');
+        return created;
       }
 
+      await this.notifyNewTrend(created, payload);
       return created;
     } catch (error) {
       console.error('Error en TrendsService.createAsync:', error);
@@ -154,6 +135,94 @@ export default class TrendsService {
       this.pool = null;
     }
   }
+
+  getTrendAlertRecipients() {
+    const envKeys = [
+      'TREND_ALERT_RECIPIENTS',
+      'NEW_TREND_ALERT_RECIPIENTS',
+      'NEW_TREND_NOTIFICATION_EMAILS'
+    ];
+    const rawList = envKeys
+      .map(key => process.env[key])
+      .find(value => typeof value === 'string' && value.trim().length > 0);
+
+    const parsed = (rawList || '')
+      .split(/[,;\n]/)
+      .map(e => e.trim().toLowerCase())
+      .filter(e => e && e.includes('@'));
+
+    const unique = Array.from(new Set(parsed));
+    if (unique.length > 0) return unique;
+
+    return ['sassonindiana@gmail.com'];
+  }
+
+  buildQuickAccessLink(trend) {
+    const explicitUrl = (process.env.NEW_TREND_QUICK_LINK || '').trim();
+    if (explicitUrl) return explicitUrl;
+
+    const baseOverride = (process.env.TREND_ALERT_PAGE_BASE_URL || '').trim().replace(/\/$/, '');
+    const pagePath = (process.env.TREND_ALERT_PAGE_PATH || '/trends').trim();
+    const normalizedPath = pagePath ? (pagePath.startsWith('/') ? pagePath : `/${pagePath}`) : '';
+    const trendId = trend?.id ? `/${trend.id}` : '';
+
+    if (baseOverride) {
+      return `${baseOverride}${normalizedPath}${trendId}`;
+    }
+
+    const frontendBase = (process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
+    if (frontendBase && trend?.id) {
+      return `${frontendBase}/trends/${trend.id}`;
+    }
+
+    return trend?.['Link_del_Trend'] || '';
+  }
+
+  async notifyNewTrend(createdTrend, sourcePayload = {}) {
+    try {
+      if (!this._emailService) {
+        const { default: EmailService } = await import('./Email-service.js');
+        this._emailService = new EmailService();
+      }
+
+      if (!this._emailService?.isEnabled()) {
+        console.log('✉️ Servicio de email deshabilitado. Notificación omitida.');
+        return;
+      }
+
+      const recipients = this.getTrendAlertRecipients();
+      if (recipients.length === 0) {
+        console.log('✉️ No hay destinatarios configurados para notificación de Trends.');
+        return;
+      }
+
+      const resumen =
+        sourcePayload.resumenCorto ||
+        createdTrend.resumenCorto ||
+        createdTrend.resumen ||
+        sourcePayload.Analisis_relacion ||
+        createdTrend['Analisis_relacion'] ||
+        'Sin resumen disponible';
+
+      const quickLink = this.buildQuickAccessLink(createdTrend);
+
+      const trendForEmail = {
+        ...createdTrend,
+        resumenCorto: resumen,
+        quickLink,
+        Relacionado: typeof createdTrend.Relacionado === 'boolean'
+          ? createdTrend.Relacionado
+          : Boolean(createdTrend.relacionado ?? sourcePayload.Relacionado),
+        Nombre_Newsletter_Relacionado:
+          createdTrend['Nombre_Newsletter_Relacionado'] ||
+          sourcePayload.Nombre_Newsletter_Relacionado ||
+          createdTrend.newsletterTitulo ||
+          ''
+      };
+
+      await this._emailService.sendNewTrendNotification(recipients, trendForEmail);
+    } catch (notifyErr) {
+      console.warn('⚠️ No se pudo enviar notificación de nuevo Trend:', notifyErr?.message || notifyErr);
+    }
+  }
 }
-
-
