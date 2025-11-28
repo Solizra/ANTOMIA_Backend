@@ -12,4 +12,18 @@
 - Para personalizar el enlace de acceso rápido incluido en el correo puedes definir `TREND_ALERT_PAGE_BASE_URL` y, opcionalmente, `TREND_ALERT_PAGE_PATH` (por defecto `/trends`). Si no se configuran, se intenta construir el enlace con `FRONTEND_URL` y, como último recurso, se usa el link original del trend.
 - Existe la variable `NEW_TREND_QUICK_LINK` si solo necesitas establecer un enlace fijo personalizado (tiene prioridad sobre los demás).
 
+### Configuración SMTP básica
+
+1. Crea (o actualiza) un archivo `.env` en la raíz con la configuración mínima:
+   ```
+   EMAIL_DISABLED=false
+   EMAIL_SERVICE=gmail          # o MAILTRAP, Outlook, etc. También puedes usar EMAIL_HOST.
+   EMAIL_USER=tu-correo@gmail.com
+   EMAIL_PASSWORD=clave_de_app  # usa una app password si es Gmail.
+   EMAIL_FROM="ANTOMIA" <tu-correo@gmail.com>
+   TREND_ALERT_RECIPIENTS=sassonindiana@gmail.com
+   ```
+2. Alternativamente puedes usar `EMAIL_SMTP_URL`, por ejemplo: `EMAIL_SMTP_URL=smtps://usuario:password@smtp.tuservidor.com`.
+3. Reinicia el backend para que el transporter se configure nuevamente (la inicialización verifica la conexión y registrará en consola si todo quedó listo).
+
 
