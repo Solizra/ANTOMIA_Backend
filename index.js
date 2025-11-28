@@ -1,4 +1,25 @@
 import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import fetch from 'node-fetch';
+import NewsletterRouter from './Controllers/Newsletter-controller.js';
+import TrendsRouter from './Controllers/Trends-controller.js';
+import FuentesRouter from './Controllers/Fuentes-controller.js';
+import FeedbackRouter from './Controllers/Feedback-controller.js';
+import AuthRouter from './Controllers/Auth-controller.js';
+import AuthService from './Services/Auth-service.js';
+import { analizarNoticiaEstructurada } from './Agent/main.js';
+import { iniciarProgramacionAutomatica } from './APIs/buscarNoticias.mjs';
+import { importSubstackFeed } from './APIs/importSubstack.mjs';
+import eventBus from './EventBus.js';
+import { apiURL } from './constants.js';
+
+const app = express();
+const port = process.env.PORT || 3000;
+const authService = new AuthService();
 
 const defaultAllowedOrigins = [
   'https://solizra.github.io',
