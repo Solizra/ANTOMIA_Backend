@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import Server from './app/core/Server.js';
 
-<<<<<<< HEAD
 const defaultAllowedOrigins = [
   'https://solizra.github.io',
   'https://antom.la',
