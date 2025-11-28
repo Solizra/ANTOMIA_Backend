@@ -37,6 +37,18 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
 
 const resolvedAllowedOrigins = [...new Set([...allowedOrigins, ...defaultAllowedOrigins])];
 
+// Middleware para resolver y fijar el origen permitido antes de procesar reqs
+app.use((req, res, next) => {
+  const originHeader = req.headers.origin;
+  const resolved = resolveAllowedOrigin(originHeader);
+  if (resolved) {
+    res.setHeader('Access-Control-Allow-Origin', resolved);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Vary', 'Origin');
+  }
+  next();
+});
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);
