@@ -1478,9 +1478,7 @@ ${textoDoc}`;
       .slice(0, 3);
 
     const resumenNormalizado = resumen?.trim() || '';
-    const resumenParaMotivo = resumenNormalizado.length > 400
-      ? `${resumenNormalizado.substring(0, 400).trim()}...`
-      : resumenNormalizado;
+    const resumenParaMotivo = resumenNormalizado;
     const motivoBase = noRelacionRazones[0] || 'No hay coincidencias temáticas claras entre la noticia y los newsletters.';
     const motivoSinRelacion = topRelacionados.length === 0
       ? [motivoBase, resumenParaMotivo ? `📝 Resumen IA: ${resumenParaMotivo}` : null].filter(Boolean).join('\n')
