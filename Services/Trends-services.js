@@ -196,6 +196,13 @@ export default class TrendsService {
         return;
       }
 
+      console.log('[TrendsService] Iniciando notifyNewTrend...', {
+        trendId: createdTrend?.id,
+        trendTitle: createdTrend?.['Título_del_Trend'] || createdTrend?.Titulo,
+        recipientsCount: recipients.length,
+        payloadHasResumen: Boolean(sourcePayload?.resumenCorto || sourcePayload?.Analisis_relacion),
+      });
+
       const resumen =
         sourcePayload.resumenCorto ||
         createdTrend.resumenCorto ||
@@ -221,6 +228,7 @@ export default class TrendsService {
       };
 
       await this._emailService.sendNewTrendNotification(recipients, trendForEmail);
+      console.log('[TrendsService] Notificación de Trend enviada con éxito.');
     } catch (notifyErr) {
       console.warn('⚠️ No se pudo enviar notificación de nuevo Trend:', notifyErr?.message || notifyErr);
     }
