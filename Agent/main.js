@@ -1077,14 +1077,21 @@ function formatIaExplanationText(text) {
 
   const normalizeSpaces = (segment) => segment.replace(/\s+/g, ' ').trim();
   const replaceMarkdownBold = (value) => value.replace(/\*\*(.+?)\*\*/gs, (_, content) => `<strong>${content.trim()}</strong>`);
+  const removeEmojis = (value) => value.replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji}\u200d]+/gu, '');
+  const truncateSentence = (value, maxWords = 38) => {
+    const words = value.split(' ');
+    if (words.length <= maxWords) return value;
+    return `${words.slice(0, maxWords).join(' ')}…`;
+  };
   const normalized = text.replace(/\r\n/g, '\n').trim();
   if (!normalized) return '';
 
-  const formatted = replaceMarkdownBold(normalized);
+  const formatted = removeEmojis(replaceMarkdownBold(normalized));
 
   const MAX_PARAGRAPHS = 3;
   const MAX_SENTENCES_PER_PARAGRAPH = 2;
   const MAX_TOTAL_SENTENCES = 6;
+  const MAX_PARAGRAPH_CHARS = 350;
   const sentenceRegex = /[^.!?]+[.!?]?/g;
 
   const clampParagraphs = (segments) => {
@@ -1094,7 +1101,7 @@ function formatIaExplanationText(text) {
     for (const segment of segments) {
       if (result.length >= MAX_PARAGRAPHS || totalSentences >= MAX_TOTAL_SENTENCES) break;
       const matches = (segment.match(sentenceRegex) || [segment])
-        .map(normalizeSpaces)
+        .map(part => truncateSentence(normalizeSpaces(part)))
         .filter(Boolean);
       if (!matches.length) continue;
 
@@ -1104,7 +1111,10 @@ function formatIaExplanationText(text) {
       );
       const selected = matches.slice(0, allowedCount);
       totalSentences += selected.length;
-      result.push(selected.join(' '));
+      const paragraph = selected.join(' ');
+      result.push(paragraph.length > MAX_PARAGRAPH_CHARS
+        ? `${paragraph.slice(0, MAX_PARAGRAPH_CHARS).replace(/\s+\S*$/, '')}…`
+        : paragraph);
     }
 
     return result;
