@@ -37,6 +37,18 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
 
 const resolvedAllowedOrigins = [...new Set([...allowedOrigins, ...defaultAllowedOrigins])];
 
+// Middleware para resolver y fijar el origen permitido antes de procesar reqs
+app.use((req, res, next) => {
+  const originHeader = req.headers.origin;
+  const resolved = resolveAllowedOrigin(originHeader);
+  if (resolved) {
+    res.setHeader('Access-Control-Allow-Origin', resolved);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Vary', 'Origin');
+  }
+  next();
+});
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);
@@ -62,6 +74,9 @@ const __dirname = path.dirname(__filename);
 const noticiasFilePath = path.join(__dirname, 'APIs', 'noticias.json');
 
 app.use(cors(corsOptions));
+// path-to-regexp v6 (Express 5) no longer accepts '*' como ruta comodín, usar RegExp
+app.options(/.*/, cors(corsOptions));
+// Fallback manual handler for preflight requests that bypass cors middleware
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', resolveAllowedOrigin(req.headers.origin) || resolvedAllowedOrigins[0] || '*');
