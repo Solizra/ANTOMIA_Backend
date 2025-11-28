@@ -13,37 +13,77 @@ class EmailService {
   initializeTransporter() {
     try {
       const emailDisabled = String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true';
-      const host = process.env.EMAIL_HOST || '';
-      const user = process.env.EMAIL_USER || '';
-      const pass = process.env.EMAIL_PASSWORD || '';
-
-      if (emailDisabled || !host || !user || !pass) {
+      if (emailDisabled) {
         this.transporter = null;
-        const reason = emailDisabled ? 'EMAIL_DISABLED habilitado' : 'Variables EMAIL_HOST/USER/PASSWORD no configuradas';
-        console.warn(`⚠️ Email deshabilitado: ${reason}. El sistema continuará sin enviar correos.`);
+        console.warn('⚠️ Email deshabilitado: EMAIL_DISABLED habilitado. El sistema continuará sin enviar correos.');
         return;
       }
 
-      this.transporter = nodemailer.createTransport({
-        host: host,
-        port: parseInt(process.env.EMAIL_PORT) || 587,
-        secure: false,
-        auth: { user, pass },
-        tls: { rejectUnauthorized: false },
-        connectionTimeout: 10000,
-        greetingTimeout: 8000,
-        socketTimeout: 15000
-      });
+      const smtpUrl = (process.env.EMAIL_SMTP_URL || process.env.SMTP_URL || '').trim();
+      if (smtpUrl) {
+        this.transporter = nodemailer.createTransport(smtpUrl);
+        this.verifyTransporter('URL SMTP');
+        return;
+      }
 
-      // Verificación opcional y no bloqueante
-      this.transporter.verify().then(() => {
-        console.log('✅ Email service configurado correctamente');
-      }).catch((error) => {
-        console.error('❌ Error configurando email service (no bloqueante):', error?.code || error?.message || error);
-      });
+      const service = (process.env.EMAIL_SERVICE || '').trim();
+      const rawHost = (process.env.EMAIL_HOST || '').trim();
+      const user = (process.env.EMAIL_USER || '').trim();
+      const pass = (process.env.EMAIL_PASSWORD || '').trim();
+      let host = rawHost;
+
+      if (!host && !service && user.endsWith('@gmail.com')) {
+        host = 'smtp.gmail.com';
+      }
+
+      if (!service && (!host || !user || !pass)) {
+        this.transporter = null;
+        console.warn('⚠️ Email deshabilitado: faltan EMAIL_HOST/USER/PASSWORD o EMAIL_SERVICE/USER/PASSWORD.');
+        this.logEmailConfigHint();
+        return;
+      }
+
+      const port = parseInt(process.env.EMAIL_PORT, 10) || (service ? undefined : 587);
+      const secure = port === 465;
+
+      const transportConfig = service
+        ? {
+            service,
+            auth: { user, pass }
+          }
+        : {
+            host,
+            port,
+            secure,
+            auth: { user, pass },
+            tls: { rejectUnauthorized: false },
+            connectionTimeout: 10000,
+            greetingTimeout: 8000,
+            socketTimeout: 15000
+          };
+
+      this.transporter = nodemailer.createTransport(transportConfig);
+      this.verifyTransporter(service ? `service:${service}` : host || 'SMTP');
     } catch (error) {
       console.error('❌ Error inicializando email service:', error);
     }
+  }
+
+  verifyTransporter(mode = 'SMTP') {
+    if (!this.transporter) return;
+    this.transporter.verify().then(() => {
+      console.log(`✅ Email service configurado correctamente (${mode})`);
+    }).catch((error) => {
+      console.error('❌ Error configurando email service (no bloqueante):', error?.code || error?.message || error);
+    });
+  }
+
+  logEmailConfigHint() {
+    console.log('ℹ️ Configura el envío de correos definiendo una de estas opciones:');
+    console.log('   - EMAIL_SMTP_URL="smtps://usuario:password@smtp.servidor.com"');
+    console.log('   - EMAIL_SERVICE="gmail" + EMAIL_USER + EMAIL_PASSWORD (usa una app password)');
+    console.log('   - EMAIL_HOST + EMAIL_PORT + EMAIL_USER + EMAIL_PASSWORD');
+    console.log('   Además define EMAIL_FROM con la dirección remitente.');
   }
 
   // Enviar notificación de nuevo Trend (BCC masivo para eficiencia)
@@ -101,9 +141,15 @@ class EmailService {
       if (quickLink || link) textLines.push(`Acceso rápido: ${quickLink || link}`);
       const text = textLines.join('\n');
 
+      const fallbackFrom = (process.env.EMAIL_FROM || process.env.EMAIL_USER || recipients[0] || 'no-reply@antomia.local').trim();
+      const fromHeader = fallbackFrom.includes('<') ? fallbackFrom : `"ANTOMIA" <${fallbackFrom}>`;
+      const toPlaceholder = (process.env.EMAIL_FROM && process.env.EMAIL_FROM.includes('@'))
+        ? process.env.EMAIL_FROM
+        : fallbackFrom;
+
       const mailOptions = {
-        from: `"ANTOMIA" <${process.env.EMAIL_FROM}>`,
-        to: process.env.EMAIL_FROM, // placeholder
+        from: fromHeader,
+        to: toPlaceholder, // placeholder
         bcc: recipients,
         subject,
         html,
