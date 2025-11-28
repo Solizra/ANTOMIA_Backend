@@ -1076,8 +1076,11 @@ function formatIaExplanationText(text) {
   if (typeof text !== 'string') return text || '';
 
   const normalizeSpaces = (segment) => segment.replace(/\s+/g, ' ').trim();
+  const replaceMarkdownBold = (value) => value.replace(/\*\*(.+?)\*\*/gs, (_, content) => `<strong>${content.trim()}</strong>`);
   const normalized = text.replace(/\r\n/g, '\n').trim();
   if (!normalized) return '';
+
+  const formatted = replaceMarkdownBold(normalized);
 
   const MAX_PARAGRAPHS = 3;
   const MAX_SENTENCES_PER_PARAGRAPH = 2;
@@ -1107,14 +1110,14 @@ function formatIaExplanationText(text) {
     return result;
   };
 
-  const byDoubleBreak = normalized
+  const byDoubleBreak = formatted
     .split(/\n{2,}/)
     .map(part => normalizeSpaces(part))
     .filter(Boolean);
   let paragraphs = clampParagraphs(byDoubleBreak);
 
   if (!paragraphs.length) {
-    const lines = normalized
+    const lines = formatted
       .split('\n')
       .map(line => normalizeSpaces(line))
       .filter(Boolean);
@@ -1122,7 +1125,7 @@ function formatIaExplanationText(text) {
   }
 
   if (!paragraphs.length) {
-    const sentences = normalized.match(sentenceRegex) || [normalized];
+    const sentences = formatted.match(sentenceRegex) || [formatted];
     const fallbackSegments = [];
     let buffer = [];
 
