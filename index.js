@@ -62,7 +62,8 @@ const __dirname = path.dirname(__filename);
 const noticiasFilePath = path.join(__dirname, 'APIs', 'noticias.json');
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+// path-to-regexp v6 (Express 5) no longer accepts '*' como ruta comodín, usar RegExp
+app.options(/.*/, cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
