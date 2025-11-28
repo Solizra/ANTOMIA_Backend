@@ -20,14 +20,58 @@ const app = express();
 const port = process.env.PORT || 3000;
 const authService = new AuthService();
 
+const defaultAllowedOrigins = [
+  'https://solizra.github.io',
+  'https://antom.la',
+  'https://www.antom.la',
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://localhost:3000'
+];
+
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+const resolvedAllowedOrigins = [...new Set([...allowedOrigins, ...defaultAllowedOrigins])];
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (resolvedAllowedOrigins.some(o => o === origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`Origen ${origin} no permitido por CORS`));
+  },
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'X-Requested-With', 'Accept'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+};
+
+function resolveAllowedOrigin(originHeader) {
+  if (!originHeader) return resolvedAllowedOrigins[0] || '*';
+  if (resolvedAllowedOrigins.includes(originHeader)) return originHeader;
+  return null;
+}
+
 // Ruta absoluta al archivo de URLs de noticias
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const noticiasFilePath = path.join(__dirname, 'APIs', 'noticias.json');
 
-app.use(cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use((err, req, res, next) => {
+  if (err?.message?.includes('no permitido por CORS')) {
+    console.warn(`⛔ Solicitud bloqueada por CORS: ${req.method} ${req.originalUrl} - ${req.headers.origin || 'sin origen'}`);
+    return res.status(403).json({ error: 'Origen no permitido por CORS' });
+  }
+  next(err);
+});
 
 // Helper robusto para extraer email desde query, headers o body en distintos formatos
 function extractEmail(req) {
@@ -428,20 +472,33 @@ app.post('/api/Newsletter/analizar', async (req, res) => {
 // Endpoint para Server-Sent Events (SSE) - Actualización en tiempo real
 app.get('/api/events', (req, res) => {
   console.log('🔌 Nueva conexión SSE solicitada desde:', req.headers.origin || req.headers.host);
-  
-  // Configurar headers para SSE con CORS completo
-  res.writeHead(200, {
+
+  const requestedOrigin = req.headers.origin;
+  const resolvedOrigin = resolveAllowedOrigin(requestedOrigin);
+
+  if (requestedOrigin && !resolvedOrigin) {
+    console.warn(`⛔ Conexión SSE rechazada por CORS: ${requestedOrigin}`);
+    return res.status(403).json({ error: 'Origen no permitido por CORS' });
+  }
+
+  const sseHeaders = {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
     'Expires': '0',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': resolvedOrigin || '*',
     'Access-Control-Allow-Headers': 'Cache-Control, Connection, Accept, Origin, X-Requested-With, Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Credentials': 'true',
-    'X-Accel-Buffering': 'no' // Deshabilitar buffering de nginx si está presente
-  });
+    'X-Accel-Buffering': 'no'
+  };
+
+  if ((resolvedOrigin || '') !== '*') {
+    sseHeaders['Access-Control-Allow-Credentials'] = 'true';
+  }
+
+  // Configurar headers para SSE con CORS completo
+  res.writeHead(200, sseHeaders);
 
   // Enviar heartbeat cada 30 segundos para mantener la conexión
   const heartbeat = setInterval(() => {
