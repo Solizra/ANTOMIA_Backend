@@ -58,22 +58,48 @@ class EmailService {
         return { skipped: true };
       }
 
+      const sanitize = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
       const subject = `Nuevo Trend: ${trend?.['Título_del_Trend'] || trend?.Titulo || 'ANTOMIA'}`;
 
       const link = trend?.['Link_del_Trend'] || trend?.link || '';
+      const quickLink = trend?.quickLink && trend.quickLink !== link ? trend.quickLink : '';
       const nl = trend?.['Nombre_Newsletter_Relacionado'] || trend?.newsletter || '';
+      const resumen = trend?.resumenCorto || trend?.Analisis_relacion || 'Sin resumen disponible';
+      const relacionado = typeof trend?.Relacionado === 'boolean'
+        ? trend.Relacionado
+        : (typeof trend?.relacionado === 'boolean' ? trend.relacionado : null);
+      const relationText = relacionado === null
+        ? 'No se pudo determinar la relación con newsletters'
+        : (relacionado
+          ? `Relacionado con ${nl || 'un newsletter registrado'}`
+          : 'Sin newsletter relacionado');
+
       const html = `
         <div style="font-family: Arial, sans-serif; line-height:1.5;">
           <h2 style="margin:0 0 12px 0;">Nuevo Trend disponible</h2>
-          <p style="margin:0 0 8px 0;"><strong>Título:</strong> ${trend?.['Título_del_Trend'] || 'Sin título'}</p>
-          ${nl ? `<p style="margin:0 0 8px 0;"><strong>Newsletter:</strong> ${nl}</p>` : ''}
-          ${link ? `<p style="margin:0 0 12px 0;"><strong>Link:</strong> <a href="${link}" target="_blank" rel="noopener">${link}</a></p>` : ''}
+          <p style="margin:0 0 8px 0;"><strong>Título:</strong> ${sanitize(trend?.['Título_del_Trend'] || 'Sin título')}</p>
+          <p style="margin:0 0 8px 0;"><strong>Resumen breve:</strong> ${sanitize(resumen)}</p>
+          <p style="margin:0 0 8px 0;"><strong>Relación:</strong> ${sanitize(relationText)}</p>
+          ${nl ? `<p style="margin:0 0 8px 0;"><strong>Newsletter:</strong> ${sanitize(nl)}</p>` : ''}
+          ${link ? `<p style="margin:0 0 8px 0;"><strong>Fuente original:</strong> <a href="${link}" target="_blank" rel="noopener">${link}</a></p>` : ''}
+          ${(quickLink || link) ? `<p style="margin:0 0 12px 0;"><strong>Acceso rápido:</strong> <a href="${quickLink || link}" target="_blank" rel="noopener">${quickLink || link}</a></p>` : ''}
           <p style="color:#777;font-size:12px;margin-top:16px;">Este mensaje fue enviado automáticamente por ANTOMIA.</p>
         </div>
       `;
-      const text = `Nuevo Trend disponible
-Titulo: ${trend?.['Título_del_Trend'] || 'Sin título'}
-${nl ? `Newsletter: ${nl}\n` : ''}${link ? `Link: ${link}\n` : ''}`;
+      const textLines = [
+        'Nuevo Trend disponible',
+        `Título: ${trend?.['Título_del_Trend'] || 'Sin título'}`,
+        `Resumen breve: ${resumen}`,
+        `Relación: ${relationText}`,
+      ];
+      if (nl) textLines.push(`Newsletter: ${nl}`);
+      if (link) textLines.push(`Fuente: ${link}`);
+      if (quickLink || link) textLines.push(`Acceso rápido: ${quickLink || link}`);
+      const text = textLines.join('\n');
 
       const mailOptions = {
         from: `"ANTOMIA" <${process.env.EMAIL_FROM}>`,
