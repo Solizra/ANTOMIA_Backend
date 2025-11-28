@@ -1076,41 +1076,78 @@ function formatIaExplanationText(text) {
   if (typeof text !== 'string') return text || '';
 
   const normalizeSpaces = (segment) => segment.replace(/\s+/g, ' ').trim();
+  const replaceMarkdownBold = (value) => value.replace(/\*\*(.+?)\*\*/gs, (_, content) => `<strong>${content.trim()}</strong>`);
   const normalized = text.replace(/\r\n/g, '\n').trim();
   if (!normalized) return '';
 
-  const byDoubleBreak = normalized
+  const formatted = replaceMarkdownBold(normalized);
+
+  const MAX_PARAGRAPHS = 3;
+  const MAX_SENTENCES_PER_PARAGRAPH = 2;
+  const MAX_TOTAL_SENTENCES = 6;
+  const sentenceRegex = /[^.!?]+[.!?]?/g;
+
+  const clampParagraphs = (segments) => {
+    let totalSentences = 0;
+    const result = [];
+
+    for (const segment of segments) {
+      if (result.length >= MAX_PARAGRAPHS || totalSentences >= MAX_TOTAL_SENTENCES) break;
+      const matches = (segment.match(sentenceRegex) || [segment])
+        .map(normalizeSpaces)
+        .filter(Boolean);
+      if (!matches.length) continue;
+
+      const allowedCount = Math.min(
+        MAX_SENTENCES_PER_PARAGRAPH,
+        MAX_TOTAL_SENTENCES - totalSentences
+      );
+      const selected = matches.slice(0, allowedCount);
+      totalSentences += selected.length;
+      result.push(selected.join(' '));
+    }
+
+    return result;
+  };
+
+  const byDoubleBreak = formatted
     .split(/\n{2,}/)
     .map(part => normalizeSpaces(part))
     .filter(Boolean);
-  if (byDoubleBreak.length > 1) {
-    return byDoubleBreak.join('\n\n');
+  let paragraphs = clampParagraphs(byDoubleBreak);
+
+  if (!paragraphs.length) {
+    const lines = formatted
+      .split('\n')
+      .map(line => normalizeSpaces(line))
+      .filter(Boolean);
+    paragraphs = clampParagraphs(lines);
   }
 
-  const lines = normalized
-    .split('\n')
-    .map(line => normalizeSpaces(line))
-    .filter(Boolean);
-  if (lines.length > 1) {
-    return lines.join('\n\n');
-  }
+  if (!paragraphs.length) {
+    const sentences = formatted.match(sentenceRegex) || [formatted];
+    const fallbackSegments = [];
+    let buffer = [];
 
-  const sentences = normalized.match(/[^.!?]+[.!?]?/g) || [normalized];
-  const paragraphs = [];
-  let buffer = [];
+    sentences.forEach((sentence) => {
+      const cleanSentence = normalizeSpaces(sentence);
+      if (!cleanSentence) return;
+      buffer.push(cleanSentence);
+      if (buffer.length >= 2 || cleanSentence.length > 180) {
+        fallbackSegments.push(buffer.join(' '));
+        buffer = [];
+      }
+    });
 
-  sentences.forEach((sentence) => {
-    const cleanSentence = normalizeSpaces(sentence);
-    if (!cleanSentence) return;
-    buffer.push(cleanSentence);
-    if (buffer.length >= 2 || cleanSentence.length > 180) {
-      paragraphs.push(buffer.join(' '));
-      buffer = [];
+    if (buffer.length) {
+      fallbackSegments.push(buffer.join(' '));
     }
-  });
 
-  if (buffer.length) {
-    paragraphs.push(buffer.join(' '));
+    paragraphs = clampParagraphs(fallbackSegments);
+  }
+
+  if (!paragraphs.length) {
+    paragraphs = [normalized];
   }
 
   return paragraphs.join('\n\n');
