@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import Server from './app/core/Server.js';
 
 const defaultAllowedOrigins = [
   'https://solizra.github.io',
