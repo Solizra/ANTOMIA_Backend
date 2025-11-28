@@ -699,7 +699,7 @@ export async function generarResumenIA(contenido) { //de donde sale el contenido
     
     // No limitar longitud máxima: mantener todo el resumen para comparaciones completas
     console.log(`✅ Resumen inteligente generado: ${resumen.length} caracteres (sin recorte máximo)`);
-    console.log(`📝 Resumen: "${resumen}"`);
+    console.log(` Resumen: "${resumen}"`);
     
     return resumen;
   } catch (error) {
@@ -1070,6 +1070,50 @@ async function explicarRelacionIA(noticia, newsletter) {
     console.error("Error en explicación IA:", err);
     return { explicacion: "⚠️ No se pudo generar explicación con IA." };
   }
+}
+
+function formatIaExplanationText(text) {
+  if (typeof text !== 'string') return text || '';
+
+  const normalizeSpaces = (segment) => segment.replace(/\s+/g, ' ').trim();
+  const normalized = text.replace(/\r\n/g, '\n').trim();
+  if (!normalized) return '';
+
+  const byDoubleBreak = normalized
+    .split(/\n{2,}/)
+    .map(part => normalizeSpaces(part))
+    .filter(Boolean);
+  if (byDoubleBreak.length > 1) {
+    return byDoubleBreak.join('\n\n');
+  }
+
+  const lines = normalized
+    .split('\n')
+    .map(line => normalizeSpaces(line))
+    .filter(Boolean);
+  if (lines.length > 1) {
+    return lines.join('\n\n');
+  }
+
+  const sentences = normalized.match(/[^.!?]+[.!?]?/g) || [normalized];
+  const paragraphs = [];
+  let buffer = [];
+
+  sentences.forEach((sentence) => {
+    const cleanSentence = normalizeSpaces(sentence);
+    if (!cleanSentence) return;
+    buffer.push(cleanSentence);
+    if (buffer.length >= 2 || cleanSentence.length > 180) {
+      paragraphs.push(buffer.join(' '));
+      buffer = [];
+    }
+  });
+
+  if (buffer.length) {
+    paragraphs.push(buffer.join(' '));
+  }
+
+  return paragraphs.join('\n\n');
 }
 
 
@@ -1443,6 +1487,7 @@ ${textoDoc}`;
             } catch (expErr) {
               console.error('⚠️ Error generando explicación detallada con explicarRelacionIA:', expErr?.message || expErr);
             }
+            explicacionRelacion = formatIaExplanationText(explicacionRelacion);
             relacionados.push({
               ...nl,
               puntuacion: isNaN(score) ? undefined : Math.round(score),
@@ -1621,7 +1666,7 @@ async function analizarNoticia(input) {
       let mensaje = `✅ Esta noticia SÍ está relacionada con Climatech.
 
 📰 Título: ${titulo}
-📝 Resumen: ${resumen}
+Resumen: ${resumen}
 
 `;
 
