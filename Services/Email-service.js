@@ -2,8 +2,10 @@ import nodemailer from 'nodemailer';
 
 class EmailService {
   constructor() {
+    console.log('🔧 [EmailService] Constructor - Inicializando EmailService');
     this.transporter = null;
     this.initializeTransporter();
+    console.log('🔧 [EmailService] Constructor - EmailService inicializado, transporter:', this.transporter ? '✅ Configurado' : '❌ No configurado');
   }
 
   isEnabled() {
@@ -107,11 +109,16 @@ class EmailService {
 
   // Enviar notificación de nuevo Trend (BCC masivo para eficiencia)
   async sendNewTrendNotification(recipients, trend) {
+    console.log('📬 [EmailService] sendNewTrendNotification - INICIANDO');
+    console.log('📬 [EmailService] Parámetros recibidos:', {
+      recipientsCount: Array.isArray(recipients) ? recipients.length : 0,
+      recipients: recipients,
+      trendId: trend?.id,
+      trendTitle: trend?.['Título_del_Trend'] || trend?.Titulo,
+    });
+    
     try {
-      console.log('[EmailService] Preparando notificación de Trend...', {
-        recipients,
-        trendId: trend?.id,
-        trendTitle: trend?.['Título_del_Trend'] || trend?.Titulo,
+      console.log('📬 [EmailService] Verificando configuración de email...', {
         hasTransporter: !!this.transporter,
         emailDisabled: String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true',
         hasEmailUser: !!process.env.EMAIL_USER,
@@ -119,6 +126,7 @@ class EmailService {
         hasEmailHost: !!process.env.EMAIL_HOST,
         hasEmailService: !!process.env.EMAIL_SERVICE,
         hasSmtpUrl: !!process.env.EMAIL_SMTP_URL,
+        emailFrom: process.env.EMAIL_FROM || 'NO DEFINIDO',
       });
       if (!Array.isArray(recipients) || recipients.length === 0) {
         console.warn('[EmailService] Notificación omitida: lista de destinatarios vacía.');
@@ -190,17 +198,22 @@ class EmailService {
         text
       };
 
-      console.log('[EmailService] Enviando correo...', {
+      console.log('📬 [EmailService] Preparando envío de correo...', {
         subject,
+        from: fromHeader,
         toPlaceholder,
         bccCount: recipients.length,
+        bccRecipients: recipients,
         hasQuickLink: Boolean(quickLink),
       });
 
+      console.log('📬 [EmailService] Llamando a transporter.sendMail()...');
       const result = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Notificación de nuevo Trend enviada a ${recipients.length} destinatarios`);
+      console.log(`✅ [EmailService] Notificación de nuevo Trend enviada a ${recipients.length} destinatarios`);
       console.log(`   Destinatarios: ${recipients.join(', ')}`);
       console.log(`   MessageId: ${result.messageId || 'N/A'}`);
+      console.log(`   Response: ${result.response || 'N/A'}`);
+      console.log('📬 [EmailService] sendNewTrendNotification - COMPLETADO EXITOSAMENTE');
       return result;
     } catch (error) {
       console.error('❌ Error enviando notificación de Trend:', error);

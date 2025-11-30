@@ -76,8 +76,10 @@ export default class TrendsService {
 
   async createAsync(payload) {
     try {
+      console.log('🔧 [TrendsService] createAsync - Iniciando creación de trend');
       // Validar newsletter ID antes de crear el trend
       if (payload.id_newsletter != null) {
+        console.log('🔧 [TrendsService] Validando newsletter ID:', payload.id_newsletter);
         const isValidNewsletter = await this.validateNewsletterId(payload.id_newsletter);
         if (!isValidNewsletter) {
           console.warn(`⚠️ Newsletter ID ${payload.id_newsletter} no existe. Estableciendo a null.`);
@@ -88,17 +90,22 @@ export default class TrendsService {
       if (typeof this.repo.createAsync !== 'function') {
         throw new Error('TrendsRepository.createAsync no está disponible en este despliegue');
       }
+      console.log('🔧 [TrendsService] Llamando a repo.createAsync...');
       const created = await this.repo.createAsync(payload);
+      console.log('🔧 [TrendsService] Trend insertado en BD, ID:', created?.id);
 
       if (created?.duplicated) {
         console.log('ℹ️ Trend duplicado detectado. Se omite notificación por correo.');
         return created;
       }
 
+      console.log('🔧 [TrendsService] Llamando a notifyNewTrend...');
       await this.notifyNewTrend(created, payload);
+      console.log('🔧 [TrendsService] createAsync completado exitosamente');
       return created;
     } catch (error) {
-      console.error('Error en TrendsService.createAsync:', error);
+      console.error('❌ [TrendsService] Error en createAsync:', error);
+      console.error('   Stack:', error?.stack);
       throw error;
     }
   }
@@ -137,23 +144,38 @@ export default class TrendsService {
   }
 
   getTrendAlertRecipients() {
+    console.log('📋 [TrendsService] getTrendAlertRecipients - Obteniendo destinatarios...');
     const envKeys = [
       'TREND_ALERT_RECIPIENTS',
       'NEW_TREND_ALERT_RECIPIENTS',
       'NEW_TREND_NOTIFICATION_EMAILS'
     ];
+    console.log('📋 [TrendsService] Buscando en variables de entorno:', envKeys);
+    
     const rawList = envKeys
-      .map(key => process.env[key])
+      .map(key => {
+        const value = process.env[key];
+        console.log(`📋 [TrendsService] ${key}:`, value ? `"${value}"` : 'NO DEFINIDO');
+        return value;
+      })
       .find(value => typeof value === 'string' && value.trim().length > 0);
+
+    console.log('📋 [TrendsService] Lista raw encontrada:', rawList || 'NINGUNA');
 
     const parsed = (rawList || '')
       .split(/[,;\n]/)
       .map(e => e.trim().toLowerCase())
       .filter(e => e && e.includes('@'));
 
-    const unique = Array.from(new Set(parsed));
-    if (unique.length > 0) return unique;
+    console.log('📋 [TrendsService] Emails parseados:', parsed);
 
+    const unique = Array.from(new Set(parsed));
+    if (unique.length > 0) {
+      console.log('📋 [TrendsService] Usando destinatarios de variables de entorno:', unique);
+      return unique;
+    }
+
+    console.log('📋 [TrendsService] Usando destinatario por defecto: sassonindiana@gmail.com');
     return ['sassonindiana@gmail.com'];
   }
 
@@ -180,26 +202,41 @@ export default class TrendsService {
 
   async notifyNewTrend(createdTrend, sourcePayload = {}) {
     try {
+      console.log('📧 [TrendsService] notifyNewTrend - INICIANDO');
+      console.log('📧 [TrendsService] Trend recibido:', {
+        id: createdTrend?.id,
+        titulo: createdTrend?.['Título_del_Trend'],
+        tieneEmailService: !!this._emailService
+      });
+      
       if (!this._emailService) {
+        console.log('📧 [TrendsService] EmailService no inicializado, importando...');
         const { default: EmailService } = await import('./Email-service.js');
         this._emailService = new EmailService();
+        console.log('📧 [TrendsService] EmailService creado');
       }
 
+      console.log('📧 [TrendsService] Verificando si EmailService está habilitado...');
       if (!this._emailService?.isEnabled()) {
-        console.log('✉️ Servicio de email deshabilitado. Notificación omitida.');
+        console.log('✉️ [TrendsService] Servicio de email deshabilitado. Notificación omitida.');
+        console.log('   Verifica las variables de entorno EMAIL_*');
         return;
       }
+      console.log('📧 [TrendsService] EmailService está habilitado ✅');
 
+      console.log('📧 [TrendsService] Obteniendo lista de destinatarios...');
       const recipients = this.getTrendAlertRecipients();
+      console.log('📧 [TrendsService] Destinatarios obtenidos:', recipients);
       if (recipients.length === 0) {
-        console.log('✉️ No hay destinatarios configurados para notificación de Trends.');
+        console.log('✉️ [TrendsService] No hay destinatarios configurados para notificación de Trends.');
         return;
       }
 
-      console.log('[TrendsService] Iniciando notifyNewTrend...', {
+      console.log('📧 [TrendsService] Preparando datos para email...', {
         trendId: createdTrend?.id,
         trendTitle: createdTrend?.['Título_del_Trend'] || createdTrend?.Titulo,
         recipientsCount: recipients.length,
+        recipients: recipients,
         payloadHasResumen: Boolean(sourcePayload?.resumenCorto || sourcePayload?.Analisis_relacion),
       });
 
@@ -227,17 +264,27 @@ export default class TrendsService {
           ''
       };
 
+      console.log('📧 [TrendsService] Llamando a sendNewTrendNotification...');
       const emailResult = await this._emailService.sendNewTrendNotification(recipients, trendForEmail);
+      console.log('📧 [TrendsService] Resultado de sendNewTrendNotification:', {
+        hasError: !!emailResult?.error,
+        hasSkipped: !!emailResult?.skipped,
+        message: emailResult?.message,
+        reason: emailResult?.reason
+      });
+      
       if (emailResult?.error) {
-        console.warn('[TrendsService] ⚠️ Error al enviar notificación de Trend:', emailResult.message);
+        console.warn('⚠️ [TrendsService] Error al enviar notificación de Trend:', emailResult.message);
       } else if (emailResult?.skipped) {
-        console.log('[TrendsService] ℹ️ Notificación de Trend omitida:', emailResult.reason || 'razón desconocida');
+        console.log('ℹ️ [TrendsService] Notificación de Trend omitida:', emailResult.reason || 'razón desconocida');
       } else {
-        console.log('[TrendsService] ✅ Notificación de Trend enviada con éxito.');
+        console.log('✅ [TrendsService] Notificación de Trend enviada con éxito.');
       }
+      console.log('📧 [TrendsService] notifyNewTrend - COMPLETADO');
     } catch (notifyErr) {
-      console.error('⚠️ No se pudo enviar notificación de nuevo Trend:', notifyErr?.message || notifyErr);
-      console.error('   Stack:', notifyErr?.stack);
+      console.error('❌ [TrendsService] ERROR en notifyNewTrend:', notifyErr?.message || notifyErr);
+      console.error('   Stack completo:', notifyErr?.stack);
+      console.error('   Tipo de error:', notifyErr?.constructor?.name);
     }
   }
 }

@@ -9,6 +9,7 @@ const feedbackSvc = new FeedbackService();
 
 router.post('/', async (req, res) => {
   try {
+    console.log('📝 [TrendsController] POST / - Iniciando creación de trend manual');
     // Coaccionar tipos básicos por seguridad
     const b = req.body || {};
     const norm = {
@@ -20,10 +21,18 @@ router.post('/', async (req, res) => {
       Relacionado: b.Relacionado,
       Analisis_relacion: b.Analisis_relacion
     };
+    console.log('📝 [TrendsController] Payload normalizado:', {
+      titulo: norm.Título_del_Trend,
+      link: norm.Link_del_Trend,
+      id_newsletter: norm.id_newsletter,
+      relacionado: norm.Relacionado
+    });
     const created = await svc.createAsync(norm);
+    console.log('📝 [TrendsController] Trend creado exitosamente, ID:', created?.id);
     res.status(201).json(created);
   } catch (e) {
-    console.error('Error creando Trend:', e);
+    console.error('❌ [TrendsController] Error creando Trend:', e);
+    console.error('   Stack:', e?.stack);
     res.status(500).json({ error: 'Error interno' });
   }
 });
