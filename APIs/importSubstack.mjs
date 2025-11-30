@@ -50,7 +50,6 @@ async function fetchWithRetry(url, options = {}, maxRetries = 3) {
           'Accept': 'application/rss+xml, application/xml, text/xml, */*',
           'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
           'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
           'Upgrade-Insecure-Requests': '1',
           'Sec-Fetch-Dest': 'document',
           'Sec-Fetch-Mode': 'navigate',

@@ -16,7 +16,6 @@ import { iniciarProgramacionAutomatica } from './APIs/buscarNoticias.mjs';
 import { importSubstackFeed } from './APIs/importSubstack.mjs';
 import eventBus from './EventBus.js';
 import { apiURL } from './constants.js';
-import { startKeepAlive } from './utils/keepAlive.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -512,7 +511,6 @@ app.get('/api/events', (req, res) => {
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
     'Expires': '0',
-    'Connection': 'keep-alive',
     'Access-Control-Allow-Origin': resolvedOrigin || '*',
     'Access-Control-Allow-Headers': 'Cache-Control, Connection, Accept, Origin, X-Requested-With, Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -582,24 +580,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Endpoint para verificar el estado del keep-alive
-app.get('/api/keep-alive/status', async (req, res) => {
-  try {
-    const { getKeepAliveStats } = await import('./utils/keepAlive.js');
-    const stats = getKeepAliveStats();
-    res.json({
-      success: true,
-      keepAlive: stats
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: 'Error al obtener estadísticas del keep-alive',
-      message: err.message
-    });
-  }
-});
-
 // Endpoint manual para probar la búsqueda de noticias
 app.post('/api/news/search-now', async (req, res) => {
   try {
@@ -633,15 +613,6 @@ app.post('/api/newsletters/import-substack-now', async (req, res) => {
 
 app.listen(port, async () => {
   console.log(`Server listening on port ${port}`);
-  
-  // Iniciar keep-alive para mantener el servidor activo (solo en producción/Render)
-  if (process.env.RENDER || process.env.NODE_ENV === 'production') {
-    try {
-      startKeepAlive();
-    } catch (error) {
-      console.error('❌ Error al iniciar keep-alive:', error);
-    }
-  }
   
   // Ejecutar búsqueda de noticias una sola vez al iniciar el servidor
   try {

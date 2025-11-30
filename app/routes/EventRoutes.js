@@ -32,7 +32,6 @@ export default class EventRoutes {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0',
-      'Connection': 'keep-alive',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Cache-Control, Connection, Accept, Origin, X-Requested-With, Content-Type',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
