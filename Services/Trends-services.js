@@ -17,7 +17,7 @@ export default class TrendsService {
       this.pool = new Pool({
         user: process.env.DB_USER,
         host: process.env.DB_HOST,
-        database: process.env.DB_NAME,
+        database: process.env.DB_DATABASE || process.env.DB_NAME, // Aceptar ambas variables
         password: process.env.DB_PASSWORD,
         port: process.env.DB_PORT,
         max: 5, // Máximo 5 conexiones
@@ -227,10 +227,17 @@ export default class TrendsService {
           ''
       };
 
-      await this._emailService.sendNewTrendNotification(recipients, trendForEmail);
-      console.log('[TrendsService] Notificación de Trend enviada con éxito.');
+      const emailResult = await this._emailService.sendNewTrendNotification(recipients, trendForEmail);
+      if (emailResult?.error) {
+        console.warn('[TrendsService] ⚠️ Error al enviar notificación de Trend:', emailResult.message);
+      } else if (emailResult?.skipped) {
+        console.log('[TrendsService] ℹ️ Notificación de Trend omitida:', emailResult.reason || 'razón desconocida');
+      } else {
+        console.log('[TrendsService] ✅ Notificación de Trend enviada con éxito.');
+      }
     } catch (notifyErr) {
-      console.warn('⚠️ No se pudo enviar notificación de nuevo Trend:', notifyErr?.message || notifyErr);
+      console.error('⚠️ No se pudo enviar notificación de nuevo Trend:', notifyErr?.message || notifyErr);
+      console.error('   Stack:', notifyErr?.stack);
     }
   }
 }

@@ -112,6 +112,13 @@ class EmailService {
         recipients,
         trendId: trend?.id,
         trendTitle: trend?.['Título_del_Trend'] || trend?.Titulo,
+        hasTransporter: !!this.transporter,
+        emailDisabled: String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true',
+        hasEmailUser: !!process.env.EMAIL_USER,
+        hasEmailPassword: !!process.env.EMAIL_PASSWORD,
+        hasEmailHost: !!process.env.EMAIL_HOST,
+        hasEmailService: !!process.env.EMAIL_SERVICE,
+        hasSmtpUrl: !!process.env.EMAIL_SMTP_URL,
       });
       if (!Array.isArray(recipients) || recipients.length === 0) {
         console.warn('[EmailService] Notificación omitida: lista de destinatarios vacía.');
@@ -120,6 +127,8 @@ class EmailService {
 
       if (!this.transporter) {
         console.warn('✉️ Notificación de Trend omitida (email deshabilitado).');
+        console.warn('   Verifica que EMAIL_DISABLED no esté en "true" y que tengas configuradas las variables de email.');
+        console.warn('   Variables necesarias: EMAIL_SMTP_URL O (EMAIL_SERVICE + EMAIL_USER + EMAIL_PASSWORD) O (EMAIL_HOST + EMAIL_USER + EMAIL_PASSWORD)');
         return { skipped: true };
       }
 
@@ -190,10 +199,21 @@ class EmailService {
 
       const result = await this.transporter.sendMail(mailOptions);
       console.log(`✅ Notificación de nuevo Trend enviada a ${recipients.length} destinatarios`);
+      console.log(`   Destinatarios: ${recipients.join(', ')}`);
+      console.log(`   MessageId: ${result.messageId || 'N/A'}`);
       return result;
     } catch (error) {
       console.error('❌ Error enviando notificación de Trend:', error);
-      throw error;
+      console.error('   Error completo:', {
+        message: error?.message,
+        code: error?.code,
+        command: error?.command,
+        response: error?.response,
+        responseCode: error?.responseCode,
+        stack: error?.stack
+      });
+      // No lanzar el error para que no rompa el flujo de creación de trends
+      return { error: true, message: error?.message || 'Error desconocido' };
     }
   }
   // Enviar email de recuperación de contraseña

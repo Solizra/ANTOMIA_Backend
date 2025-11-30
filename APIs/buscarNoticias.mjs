@@ -1,4 +1,5 @@
 // buscarNoticias.mjs
+import 'dotenv/config'; // Cargar variables de entorno
 import fetch from 'node-fetch';
 import fs from 'fs';
 import cron from 'node-cron';
