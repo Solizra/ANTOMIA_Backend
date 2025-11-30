@@ -1996,7 +1996,17 @@ export async function procesarUrlsYPersistir(items = []) {
               Relacionado: true,
               Analisis_relacion: nl.analisisRelacion || ''
             };
+            console.log('🤖 [Agent] Llamando a trendsSvc.createAsync para crear trend...', {
+              titulo: payload.Título_del_Trend,
+              link: payload.Link_del_Trend,
+              id_newsletter: payload.id_newsletter
+            });
             const createdTrend = await trendsSvc.createAsync(payload);
+            console.log('🤖 [Agent] Trend creado, resultado:', {
+              id: createdTrend?.id,
+              duplicated: createdTrend?.duplicated,
+              titulo: createdTrend?.['Título_del_Trend']
+            });
             
             // Verificar si es un duplicado
             if (createdTrend?.duplicated) {
@@ -2046,7 +2056,16 @@ export async function procesarUrlsYPersistir(items = []) {
             Relacionado: false, // No relacionado
             Analisis_relacion: (resultado.motivoSinRelacion || '').trim() || 'Noticia climatech sin newsletters relacionados'
           };
+          console.log('🤖 [Agent] Llamando a trendsSvc.createAsync para crear trend SIN newsletter...', {
+            titulo: payload.Título_del_Trend,
+            link: payload.Link_del_Trend
+          });
           const createdTrend = await trendsSvc.createAsync(payload);
+          console.log('🤖 [Agent] Trend creado (sin newsletter), resultado:', {
+            id: createdTrend?.id,
+            duplicated: createdTrend?.duplicated,
+            titulo: createdTrend?.['Título_del_Trend']
+          });
           
           // Verificar si es un duplicado
           if (createdTrend?.duplicated) {

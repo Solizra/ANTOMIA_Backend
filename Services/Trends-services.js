@@ -90,18 +90,23 @@ export default class TrendsService {
       if (typeof this.repo.createAsync !== 'function') {
         throw new Error('TrendsRepository.createAsync no está disponible en este despliegue');
       }
-      console.log('🔧 [TrendsService] Llamando a repo.createAsync...');
+      console.log('🔧 [TrendsService] Llamando a repo.createAsync para insertar en BD...');
       const created = await this.repo.createAsync(payload);
-      console.log('🔧 [TrendsService] Trend insertado en BD, ID:', created?.id);
+      console.log('✅ [TrendsService] Trend insertado exitosamente en BD:', {
+        id: created?.id,
+        titulo: created?.['Título_del_Trend'],
+        duplicated: created?.duplicated
+      });
 
       if (created?.duplicated) {
-        console.log('ℹ️ Trend duplicado detectado. Se omite notificación por correo.');
+        console.log('ℹ️ [TrendsService] Trend duplicado detectado. Se omite notificación por correo.');
         return created;
       }
 
-      console.log('🔧 [TrendsService] Llamando a notifyNewTrend...');
+      console.log('📧 [TrendsService] Trend NO es duplicado. Procediendo a enviar notificación por email...');
+      console.log('📧 [TrendsService] Llamando a notifyNewTrend DESPUÉS de insertar en BD...');
       await this.notifyNewTrend(created, payload);
-      console.log('🔧 [TrendsService] createAsync completado exitosamente');
+      console.log('✅ [TrendsService] notifyNewTrend completado. createAsync finalizado exitosamente.');
       return created;
     } catch (error) {
       console.error('❌ [TrendsService] Error en createAsync:', error);

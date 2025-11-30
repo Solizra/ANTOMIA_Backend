@@ -90,6 +90,16 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Middleware de logging para todas las peticiones
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`📥 [${timestamp}] ${req.method} ${req.originalUrl || req.url}`);
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log(`   Body:`, JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
+
 app.use((err, req, res, next) => {
   if (err?.message?.includes('no permitido por CORS')) {
     console.warn(`⛔ Solicitud bloqueada por CORS: ${req.method} ${req.originalUrl} - ${req.headers.origin || 'sin origen'}`);
@@ -173,11 +183,15 @@ const requireAdderWhitelist = (req, res, next) => {
 };
 
 // Definición de rutas principales (cada una con su controlador y servicio detrás)
+console.log('🔗 [index.js] Registrando rutas de la API...');
 app.use('/api/Newsletter', NewsletterRouter); // `${apiURL}/api/Newsletter`
+console.log('🔗 [index.js] Registrando ruta /api/Trends');
 app.use('/api/Trends', TrendsRouter); // `${apiURL}/api/Trends`
+console.log('✅ [index.js] Ruta /api/Trends registrada correctamente');
 app.use('/api/Fuentes', FuentesRouter); // `${apiURL}/api/Fuentes`
 app.use('/api/Feedback', FeedbackRouter); // `${apiURL}/api/Feedback`
 app.use('/api/auth', AuthRouter); // `${apiURL}/api/auth`
+console.log('✅ [index.js] Todas las rutas registradas');
 
 // Alias de endpoints de usuarios para compatibilidad con frontend: /api/users
 app.get('/api/users', async (req, res) => {
@@ -612,7 +626,13 @@ app.post('/api/newsletters/import-substack-now', async (req, res) => {
 });
 
 app.listen(port, async () => {
-  console.log(`Server listening on port ${port}`);
+  console.log(`🚀 [index.js] Server listening on port ${port}`);
+  console.log(`🚀 [index.js] Servidor iniciado correctamente`);
+  console.log(`🚀 [index.js] Rutas disponibles:`);
+  console.log(`   - POST /api/Trends`);
+  console.log(`   - GET /api/Trends`);
+  console.log(`   - GET /api/Trends/:id`);
+  console.log(`   - DELETE /api/Trends/:id`);
   
   // Ejecutar búsqueda de noticias una sola vez al iniciar el servidor
   try {
