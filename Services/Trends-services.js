@@ -90,6 +90,7 @@ export default class TrendsService {
       if (typeof this.repo.createAsync !== 'function') {
         throw new Error('TrendsRepository.createAsync no está disponible en este despliegue');
       }
+      // PASO 1: Insertar el trend en la base de datos
       console.log('🔧 [TrendsService] Llamando a repo.createAsync para insertar en BD...');
       const created = await this.repo.createAsync(payload);
       console.log('✅ [TrendsService] Trend insertado exitosamente en BD:', {
@@ -103,13 +104,16 @@ export default class TrendsService {
         return created;
       }
 
-      // IMPORTANTE: El análisis ya está hecho y guardado en BD.
+      // PASO 2: DESPUÉS de insertar en BD, enviar notificación por email
+      // IMPORTANTE: El trend ya está guardado en BD en este punto.
       // El envío de email es independiente y no debe bloquear ni repetir el análisis.
-      console.log('📧 [TrendsService] Trend NO es duplicado. Enviando notificación por email de forma asíncrona...');
-      console.log('📧 [TrendsService] El análisis ya está completo y guardado en BD. El email se enviará en segundo plano.');
+      console.log('📧 [TrendsService] Trend NO es duplicado. El trend ya está guardado en BD.');
+      console.log('📧 [TrendsService] Ahora se enviará la notificación por email...');
+      console.log('📧 [TrendsService] El análisis ya está completo y guardado. El email se enviará en segundo plano.');
       
-      // Ejecutar notificación de email de forma asíncrona (fire and forget)
+      // Ejecutar notificación de email DESPUÉS de insertar en BD (fire and forget)
       // Esto asegura que el análisis no se repita aunque el email falle
+      // El trend ya está persistido en BD, así que el email puede fallar sin afectar el análisis
       this.notifyNewTrend(created, payload).catch((emailError) => {
         // El error ya se maneja dentro de notifyNewTrend, esto es solo un catch de seguridad
         console.error('❌ [TrendsService] Error crítico en notificación de email (no afecta el análisis):', emailError?.message || emailError);
@@ -216,10 +220,12 @@ export default class TrendsService {
   }
 
   async notifyNewTrend(createdTrend, sourcePayload = {}) {
-    // IMPORTANTE: Esta función solo envía emails. El análisis ya está completo y guardado en BD.
+    // IMPORTANTE: Esta función se llama DESPUÉS de que el trend ya fue insertado en la BD.
+    // Esta función solo envía emails. El análisis ya está completo y guardado en BD.
     // Si el email falla, el análisis NO se repite. Esta función es independiente del análisis.
     try {
-      console.log('📧 [TrendsService] notifyNewTrend - INICIANDO (solo envío de email, análisis ya completo)');
+      console.log('📧 [TrendsService] notifyNewTrend - INICIANDO');
+      console.log('📧 [TrendsService] ⚠️ IMPORTANTE: El trend ya está guardado en BD. Solo se enviará el email.');
       console.log('📧 [TrendsService] Trend recibido:', {
         id: createdTrend?.id,
         titulo: createdTrend?.['Título_del_Trend'],
