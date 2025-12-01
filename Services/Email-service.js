@@ -16,7 +16,7 @@ class EmailService {
       const emailDisabled = String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true';
       console.log('[EmailService] Inicializando servicio de email...', {
         emailDisabled,
-        hasSmtpPass: !!process.env.SMTP_PASS,
+        hasBrevoApiKey: !!process.env.BREVO_API_KEY,
         hasEmailFrom: !!process.env.EMAIL_FROM,
       });
       
@@ -26,12 +26,14 @@ class EmailService {
         return;
       }
 
-      // Validar SMTP_PASS (obligatorio - contiene la API key de Brevo)
-      const apiKey = (process.env.SMTP_PASS || '').trim();
+      // Validar BREVO_API_KEY (obligatorio - API key de Brevo para envío transaccional)
+      // NOTA: No usamos SMTP porque Render bloquea los puertos SMTP por seguridad
+      const apiKey = (process.env.BREVO_API_KEY || '').trim();
       if (!apiKey) {
         this.isServiceEnabled = false;
-        console.warn('⚠️ Email deshabilitado: SMTP_PASS no está definido.');
-        console.warn('   Define SMTP_PASS con tu API key de Brevo para habilitar el envío de correos.');
+        console.warn('⚠️ Email deshabilitado: BREVO_API_KEY no está definido.');
+        console.warn('   Define BREVO_API_KEY con tu API key de Brevo para habilitar el envío de correos.');
+        console.warn('   NOTA: No se usa SMTP porque Render bloquea los puertos SMTP por seguridad.');
         return;
       }
 
@@ -57,8 +59,9 @@ class EmailService {
   logEmailConfigHint() {
     console.log('ℹ️ Configura el envío de correos definiendo las siguientes variables:');
     console.log('   OBLIGATORIAS:');
-    console.log('   - SMTP_PASS (tu API key de Brevo)');
+    console.log('   - BREVO_API_KEY (tu API key de Brevo para envío transaccional)');
     console.log('   - EMAIL_FROM (dirección remitente, ej: "ANTOMIA" <ia.antom2025@gmail.com>)');
+    console.log('   NOTA: No se usa SMTP porque Render bloquea los puertos SMTP por seguridad.');
   }
 
   /**
@@ -167,7 +170,7 @@ class EmailService {
       console.log('📬 [EmailService] Verificando configuración de email...', {
         isServiceEnabled: this.isServiceEnabled,
         emailDisabled: String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true',
-        hasSmtpPass: !!process.env.SMTP_PASS,
+        hasBrevoApiKey: !!process.env.BREVO_API_KEY,
         emailFrom: process.env.EMAIL_FROM || '⚠️ NO DEFINIDO',
       });
 
@@ -179,7 +182,8 @@ class EmailService {
       if (!this.isServiceEnabled) {
         console.warn('✉️ Notificación de Trend omitida (email deshabilitado).');
         console.warn('   Verifica que EMAIL_DISABLED no esté en "true" y que tengas configuradas las variables de email.');
-        console.warn('   Variables necesarias: SMTP_PASS (API key de Brevo), EMAIL_FROM');
+        console.warn('   Variables necesarias: BREVO_API_KEY (API key de Brevo), EMAIL_FROM');
+        console.warn('   NOTA: No se usa SMTP porque Render bloquea los puertos SMTP por seguridad.');
         return { skipped: true };
       }
 
