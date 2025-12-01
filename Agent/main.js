@@ -1045,9 +1045,20 @@ async function explicarRelacionIA(noticia, newsletter) {
     const resp = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "Eres un analista experto que encuentra similitudes específicas y detalladas entre textos. Tu explicación debe ser concreta, mencionando nombres de empresas, tecnologías, lugares, temas específicos compartidos, aspectos técnicos o de negocio que los conectan, y por qué la relación es relevante. Evita generalidades." },
-        { role: "user", content: `Noticia:\n${noticia}\n\nNewsletter:\n${newsletter}\n\n
-           Proporciona una explicación DETALLADA, ESPECÍFICA y DIVIDIDA EN MÍNIMO 2 PÁRRAFOS SEPARADOS CON UN ENTER de MÍNIMO 4 a 8 oraciones o un poquiito mas pero no pasarse sobre por qué están relacionados los newsletter con las noticias, no solo la epxlicaicón de esta. Integra todos estos puntos no de forma literal, sino de forma clara y fluida dentro de tu texto: 1) Breve explicacion de la noticia 2)Qué en especifico nombra que se nombra también en el Newsletter 3)Nombres concretos de empresas, tecnologías, productos o lugares mencionados en ambos textos,  4) Aspectos técnicos o de negocio que los conectan, 5) Contexto o implicaciones específicas de la relación, 6) Por qué esta relación es relevante. Que sea detallado e incluya párrafos separados y coherentes.` }
+        { role: "system", content: "Eres un analista experto que redacta explicaciones claras y completas sobre noticias y su relación con newsletters. Siempre escribes en español neutro, con buena redacción y sin usar viñetas ni listas." },
+        { 
+          role: "user",
+          content: `Noticia:\n${noticia}\n\nNewsletter:\n${newsletter}\n\n
+Quiero que generes el texto que se mostrará debajo de la etiqueta "Razonamiento IA". Debe ser un texto COHERENTE y COMPLETO dividido en PÁRRAFOS separados por dos saltos de línea (es decir, usa "\\n\\n" entre párrafos, sin viñetas ni guiones). Estructúralo así, pero sin enumerar explícitamente los puntos:
+
+- Primer párrafo: resume la noticia con tus propias palabras, explicando con claridad qué está pasando. Menciona y resalta los nombres de las compañías, organizaciones o lugares importantes (por ejemplo, escribiéndolos en MAYÚSCULAS parciales o totales para que destaquen dentro del texto continuo).
+- Segundo párrafo (y, solo si es útil, un tercer párrafo corto): explica por qué esta noticia se relaciona con el newsletter dado. Describe QUÉ elementos concretos comparten (empresas, tecnologías, productos, proyectos, lugares, sectores, métricas o contextos regulatorios), cómo se conectan a nivel técnico o de negocio y por qué esa relación es relevante para alguien que sigue el newsletter.
+
+Indicaciones de formato IMPORTANTES:
+- Usa únicamente texto corrido, sin listas ni encabezados.
+- Asegúrate de que haya al menos 2 párrafos claramente separados por "\\n\\n".
+- Si realmente no encuentras una relación clara con el newsletter, usa igualmente el segundo párrafo para explicarlo de forma explícita y honesta (por qué parecen no estar relacionados) sin inventar coincidencias falsas.` 
+        }
       ]
     });
     return { explicacion: resp?.choices?.[0]?.message?.content?.trim?.() || "" };
@@ -1057,9 +1068,20 @@ async function explicarRelacionIA(noticia, newsletter) {
         const resp2 = await insecureClient.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
-            { role: "system", content: "Eres un analista experto que encuentra similitudes específicas y detalladas entre textos. Tu explicación debe ser concreta, mencionando nombres de empresas, tecnologías, lugares, temas específicos compartidos, aspectos técnicos o de negocio que los conectan, y por qué la relación es relevante. Evita generalidades." },
-            { role: "user", content: `Noticia:\n${noticia}\n\nNewsletter:\n${newsletter}\n\n
-            Proporciona una explicación DETALLADA y ESPECÍFICA de 4 a 8 oraciones sobre por qué están relacionados. Incluye: 1) Nombres concretos de empresas, tecnologías, productos o lugares mencionados en ambos textos, 2) Temas específicos que comparten, 3) Aspectos técnicos o de negocio que los conectan, 4) Contexto o implicaciones específicas de la relación, 5) Por qué esta relación es relevante. Evita explicaciones genéricas.` }
+            { role: "system", content: "Eres un analista experto que redacta explicaciones claras y completas sobre noticias y su relación con newsletters. Siempre escribes en español neutro, con buena redacción y sin usar viñetas ni listas." },
+            { 
+              role: "user",
+              content: `Noticia:\n${noticia}\n\nNewsletter:\n${newsletter}\n\n
+Quiero que generes el texto que se mostrará debajo de la etiqueta "Razonamiento IA". Debe ser un texto COHERENTE y COMPLETO dividido en PÁRRAFOS separados por dos saltos de línea (es decir, usa "\\n\\n" entre párrafos, sin viñetas ni guiones). Estructúralo así, pero sin enumerar explícitamente los puntos:
+
+- Primer párrafo: resume la noticia con tus propias palabras, explicando con claridad qué está pasando. Menciona y resalta los nombres de las compañías, organizaciones o lugares importantes (por ejemplo, escribiéndolos en MAYÚSCULAS parciales o totales para que destaquen dentro del texto continuo).
+- Segundo párrafo (y, solo si es útil, un tercer párrafo corto): explica por qué esta noticia se relaciona con el newsletter dado. Describe QUÉ elementos concretos comparten (empresas, tecnologías, productos, proyectos, lugares, sectores, métricas o contextos regulatorios), cómo se conectan a nivel técnico o de negocio y por qué esa relación es relevante para alguien que sigue el newsletter.
+
+Indicaciones de formato IMPORTANTES:
+- Usa únicamente texto corrido, sin listas ni encabezados.
+- Asegúrate de que haya al menos 2 párrafos claramente separados por "\\n\\n".
+- Si realmente no encuentras una relación clara con el newsletter, usa igualmente el segundo párrafo para explicarlo de forma explícita y honesta (por qué parecen no estar relacionados) sin inventar coincidencias falsas.` 
+            }
           ]
         });
         return { explicacion: resp2?.choices?.[0]?.message?.content?.trim?.() || "" };
