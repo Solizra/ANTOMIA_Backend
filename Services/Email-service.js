@@ -17,11 +17,11 @@ class EmailService {
       const emailDisabled = String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true';
       console.log('[EmailService] Inicializando transporter...', {
         emailDisabled,
-        hasSmtpUrl: Boolean(process.env.EMAIL_SMTP_URL || process.env.SMTP_URL),
-        service: process.env.EMAIL_SERVICE || '',
-        host: process.env.EMAIL_HOST || '',
-        user: process.env.EMAIL_USER ? '[set]' : '[missing]',
-        port: process.env.EMAIL_PORT || '',
+        hasSmtpHost: !!process.env.SMTP_HOST,
+        hasSmtpPort: !!process.env.SMTP_PORT,
+        hasSmtpUser: !!process.env.SMTP_USER,
+        hasSmtpPass: !!process.env.SMTP_PASS,
+        hasEmailFrom: !!process.env.EMAIL_FROM,
       });
       if (emailDisabled) {
         this.transporter = null;
@@ -29,58 +29,33 @@ class EmailService {
         return;
       }
 
-      const smtpUrl = (process.env.EMAIL_SMTP_URL || process.env.SMTP_URL || '').trim();
-      if (smtpUrl) {
-        console.log('[EmailService] Creando transporter usando SMTP URL directa.');
-        this.transporter = nodemailer.createTransport(smtpUrl);
-        this.verifyTransporter('URL SMTP');
-        return;
-      }
+      const host = (process.env.SMTP_HOST || '').trim();
+      const port = parseInt(process.env.SMTP_PORT, 10);
+      const user = (process.env.SMTP_USER || '').trim();
+      const pass = (process.env.SMTP_PASS || '').trim();
 
-      const service = (process.env.EMAIL_SERVICE || '').trim();
-      const rawHost = (process.env.EMAIL_HOST || '').trim();
-      const user = (process.env.EMAIL_USER || '').trim();
-      const pass = (process.env.EMAIL_PASSWORD || '').trim();
-      let host = rawHost;
-
-      if (!host && !service && user.endsWith('@gmail.com')) {
-        host = 'smtp.gmail.com';
-      }
-
-      if (!service && (!host || !user || !pass)) {
+      if (!host || !port || !user || !pass) {
         this.transporter = null;
-        console.warn('⚠️ Email deshabilitado: faltan EMAIL_HOST/USER/PASSWORD o EMAIL_SERVICE/USER/PASSWORD.');
-        this.logEmailConfigHint();
+        console.warn('⚠️ Email deshabilitado: faltan variables de configuración SMTP.');
+        console.warn('   Variables necesarias: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM');
         return;
       }
 
-      const port = parseInt(process.env.EMAIL_PORT, 10) || (service ? undefined : 587);
-      const secure = port === 465;
-
-      const transportConfig = service
-        ? {
-            service,
-            auth: { user, pass }
-          }
-        : {
-            host,
-            port,
-            secure,
-            auth: { user, pass },
-            tls: { rejectUnauthorized: false },
-            connectionTimeout: 10000,
-            greetingTimeout: 8000,
-            socketTimeout: 15000
-          };
-
-      console.log('[EmailService] Creando transporter usando configuración detallada.', {
-        mode: service ? `service:${service}` : 'custom-host',
-        resolvedHost: transportConfig.host || service,
-        resolvedPort: transportConfig.port || '[by-service]',
-        secure,
+      this.transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
       });
-      this.transporter = nodemailer.createTransport(transportConfig);
-      this.verifyTransporter(service ? `service:${service}` : host || 'SMTP');
+
+      console.log('[EmailService] Creando transporter usando configuración Brevo.', {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER ? '[set]' : '[missing]',
+      });
+      this.verifyTransporter('Brevo SMTP');
     } catch (error) {
       console.error('❌ Error inicializando email service:', error);
     }
@@ -100,11 +75,12 @@ class EmailService {
   }
 
   logEmailConfigHint() {
-    console.log('ℹ️ Configura el envío de correos definiendo una de estas opciones:');
-    console.log('   - EMAIL_SMTP_URL="smtps://usuario:password@smtp.servidor.com"');
-    console.log('   - EMAIL_SERVICE="gmail" + EMAIL_USER + EMAIL_PASSWORD (usa una app password)');
-    console.log('   - EMAIL_HOST + EMAIL_PORT + EMAIL_USER + EMAIL_PASSWORD');
-    console.log('   Además define EMAIL_FROM con la dirección remitente.');
+    console.log('ℹ️ Configura el envío de correos definiendo las siguientes variables:');
+    console.log('   - SMTP_HOST (ej: smtp-relay.brevo.com)');
+    console.log('   - SMTP_PORT (ej: 587)');
+    console.log('   - SMTP_USER (tu API key de Brevo)');
+    console.log('   - SMTP_PASS (tu API key de Brevo)');
+    console.log('   - EMAIL_FROM (dirección remitente)');
   }
 
   // Enviar notificación de nuevo Trend (BCC masivo para eficiencia)
@@ -121,11 +97,10 @@ class EmailService {
       console.log('📬 [EmailService] Verificando configuración de email...', {
         hasTransporter: !!this.transporter,
         emailDisabled: String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true',
-        hasEmailUser: !!process.env.EMAIL_USER,
-        hasEmailPassword: !!process.env.EMAIL_PASSWORD,
-        hasEmailHost: !!process.env.EMAIL_HOST,
-        hasEmailService: !!process.env.EMAIL_SERVICE,
-        hasSmtpUrl: !!process.env.EMAIL_SMTP_URL,
+        hasSmtpHost: !!process.env.SMTP_HOST,
+        hasSmtpPort: !!process.env.SMTP_PORT,
+        hasSmtpUser: !!process.env.SMTP_USER,
+        hasSmtpPass: !!process.env.SMTP_PASS,
         emailFrom: process.env.EMAIL_FROM || 'NO DEFINIDO',
       });
       if (!Array.isArray(recipients) || recipients.length === 0) {
@@ -136,7 +111,7 @@ class EmailService {
       if (!this.transporter) {
         console.warn('✉️ Notificación de Trend omitida (email deshabilitado).');
         console.warn('   Verifica que EMAIL_DISABLED no esté en "true" y que tengas configuradas las variables de email.');
-        console.warn('   Variables necesarias: EMAIL_SMTP_URL O (EMAIL_SERVICE + EMAIL_USER + EMAIL_PASSWORD) O (EMAIL_HOST + EMAIL_USER + EMAIL_PASSWORD)');
+        console.warn('   Variables necesarias: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM');
         return { skipped: true };
       }
 
@@ -183,14 +158,10 @@ class EmailService {
       if (quickLink || link) textLines.push(`Acceso rápido: ${quickLink || link}`);
       const text = textLines.join('\n');
 
-      const fallbackFrom = (process.env.EMAIL_FROM || process.env.EMAIL_USER || recipients[0] || 'no-reply@antomia.local').trim();
-      const fromHeader = fallbackFrom.includes('<') ? fallbackFrom : `"ANTOMIA" <${fallbackFrom}>`;
-      const toPlaceholder = (process.env.EMAIL_FROM && process.env.EMAIL_FROM.includes('@'))
-        ? process.env.EMAIL_FROM
-        : fallbackFrom;
+      const toPlaceholder = process.env.EMAIL_FROM || recipients[0] || 'no-reply@antomia.local';
 
       const mailOptions = {
-        from: fromHeader,
+        from: process.env.EMAIL_FROM,
         to: toPlaceholder, // placeholder
         bcc: recipients,
         subject,
@@ -200,7 +171,7 @@ class EmailService {
 
       console.log('📬 [EmailService] Preparando envío de correo...', {
         subject,
-        from: fromHeader,
+        from: process.env.EMAIL_FROM,
         toPlaceholder,
         bccCount: recipients.length,
         bccRecipients: recipients,
@@ -238,7 +209,7 @@ class EmailService {
       const resetUrl = `${process.env.FRONTEND_URL}/change-password?token=${resetToken}`;
       
       const mailOptions = {
-        from: `"ANTOMIA" <${process.env.EMAIL_FROM}>`,
+        from: process.env.EMAIL_FROM,
         to: email,
         subject: 'Recuperar Contraseña - ANTOMIA',
         html: this.getPasswordResetEmailTemplate(userName, resetUrl),
@@ -261,7 +232,7 @@ class EmailService {
       return { skipped: true };
 
       const mailOptions = {
-        from: `"ANTOMIA" <${process.env.EMAIL_FROM}>`,
+        from: process.env.EMAIL_FROM,
         to: email,
         subject: 'Contraseña Actualizada - ANTOMIA',
         html: this.getPasswordChangeConfirmationTemplate(userName),

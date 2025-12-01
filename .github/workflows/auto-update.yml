@@ -34,12 +34,10 @@ jobs:
           echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
           echo "API_URL=${{secrets.API_URL}}" >> .env
           echo "EMAIL_DISABLED=${{ secrets.EMAIL_DISABLED }}" >> .env
-          echo "EMAIL_SERVICE=${{ secrets.EMAIL_SERVICE }}" >> .env
-          echo "EMAIL_SMTP_URL=${{ secrets.EMAIL_SMTP_URL }}" >> .env
-          echo "EMAIL_HOST=${{ secrets.EMAIL_HOST }}" >> .env
-          echo "EMAIL_PORT=${{ secrets.EMAIL_PORT }}" >> .env
-          echo "EMAIL_USER=${{ secrets.EMAIL_USER }}" >> .env
-          echo "EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}" >> .env
+          echo "SMTP_HOST=${{ secrets.SMTP_HOST }}" >> .env
+          echo "SMTP_PORT=${{ secrets.SMTP_PORT }}" >> .env
+          echo "SMTP_USER=${{ secrets.SMTP_USER }}" >> .env
+          echo "SMTP_PASS=${{ secrets.SMTP_PASS }}" >> .env
           echo "EMAIL_FROM=${{ secrets.EMAIL_FROM }}" >> .env
           echo "TREND_ALERT_RECIPIENTS=${{ secrets.TREND_ALERT_RECIPIENTS }}" >> .env
           echo "NEW_TREND_QUICK_LINK=${{ secrets.NEW_TREND_QUICK_LINK }}" >> .env
