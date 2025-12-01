@@ -21,43 +21,83 @@ class EmailService {
         hasSmtpPort: !!process.env.SMTP_PORT,
         hasSmtpUser: !!process.env.SMTP_USER,
         hasSmtpPass: !!process.env.SMTP_PASS,
+        hasEmailUser: !!process.env.EMAIL_USER,
+        hasEmailPassword: !!process.env.EMAIL_PASSWORD,
         hasEmailFrom: !!process.env.EMAIL_FROM,
       });
+      
       if (emailDisabled) {
         this.transporter = null;
         console.warn('⚠️ Email deshabilitado: EMAIL_DISABLED habilitado. El sistema continuará sin enviar correos.');
         return;
       }
 
-      const host = (process.env.SMTP_HOST || '').trim();
-      const port = parseInt(process.env.SMTP_PORT, 10);
-      const user = (process.env.SMTP_USER || '').trim();
-      const pass = (process.env.SMTP_PASS || '').trim();
+      // Validar EMAIL_FROM (obligatorio)
+      if (!process.env.EMAIL_FROM || !process.env.EMAIL_FROM.trim()) {
+        console.warn('⚠️ EMAIL_FROM no está definido. Los emails pueden fallar al enviarse.');
+        console.warn('   Define EMAIL_FROM con la dirección remitente (ej: "ANTOMIA" <ia.antom2025@gmail.com>)');
+      }
 
-      if (!host || !port || !user || !pass) {
+      // Intentar usar SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS primero (configuración principal)
+      const smtpHost = (process.env.SMTP_HOST || '').trim();
+      const smtpPort = parseInt(process.env.SMTP_PORT, 10);
+      const smtpUser = (process.env.SMTP_USER || '').trim();
+      const smtpPass = (process.env.SMTP_PASS || '').trim();
+
+      // Fallback a EMAIL_USER/EMAIL_PASSWORD si faltan SMTP_USER/SMTP_PASS
+      const emailUser = (process.env.EMAIL_USER || '').trim();
+      const emailPassword = (process.env.EMAIL_PASSWORD || '').trim();
+
+      // Determinar qué credenciales usar
+      let finalUser, finalPass, usingFallback = false;
+      
+      if (smtpUser && smtpPass) {
+        finalUser = smtpUser;
+        finalPass = smtpPass;
+        console.log('[EmailService] Usando SMTP_USER y SMTP_PASS (configuración principal)');
+      } else if (emailUser && emailPassword) {
+        finalUser = emailUser;
+        finalPass = emailPassword;
+        usingFallback = true;
+        console.warn('⚠️ [EmailService] Usando EMAIL_USER y EMAIL_PASSWORD como fallback.');
+        console.warn('   Se recomienda usar SMTP_USER y SMTP_PASS para mejor compatibilidad con Brevo.');
+      } else {
         this.transporter = null;
-        console.warn('⚠️ Email deshabilitado: faltan variables de configuración SMTP.');
-        console.warn('   Variables necesarias: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM');
+        console.warn('⚠️ Email deshabilitado: faltan credenciales de autenticación.');
+        console.warn('   Variables necesarias: SMTP_USER + SMTP_PASS (o EMAIL_USER + EMAIL_PASSWORD como fallback)');
+        return;
+      }
+
+      // Validar host y port
+      if (!smtpHost || !smtpPort || isNaN(smtpPort)) {
+        this.transporter = null;
+        console.warn('⚠️ Email deshabilitado: faltan SMTP_HOST o SMTP_PORT.');
+        console.warn('   Variables necesarias: SMTP_HOST, SMTP_PORT');
+        if (usingFallback) {
+          console.warn('   Nota: Aunque tengas EMAIL_USER/EMAIL_PASSWORD, aún necesitas SMTP_HOST y SMTP_PORT.');
+        }
         return;
       }
 
       this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
+        host: smtpHost,
+        port: smtpPort,
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
+          user: finalUser,
+          pass: finalPass
         }
       });
 
-      console.log('[EmailService] Creando transporter usando configuración Brevo.', {
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
-        user: process.env.SMTP_USER ? '[set]' : '[missing]',
+      console.log('[EmailService] ✅ Transporter creado usando configuración Brevo.', {
+        host: smtpHost,
+        port: smtpPort,
+        user: finalUser ? '[set]' : '[missing]',
+        usingFallback: usingFallback ? 'EMAIL_USER/EMAIL_PASSWORD' : 'SMTP_USER/SMTP_PASS',
       });
       this.verifyTransporter('Brevo SMTP');
     } catch (error) {
       console.error('❌ Error inicializando email service:', error);
+      this.transporter = null;
     }
   }
 
@@ -76,11 +116,16 @@ class EmailService {
 
   logEmailConfigHint() {
     console.log('ℹ️ Configura el envío de correos definiendo las siguientes variables:');
+    console.log('   OBLIGATORIAS:');
+    console.log('   - EMAIL_FROM (dirección remitente, ej: "ANTOMIA" <ia.antom2025@gmail.com>)');
     console.log('   - SMTP_HOST (ej: smtp-relay.brevo.com)');
     console.log('   - SMTP_PORT (ej: 587)');
+    console.log('   PRINCIPALES (recomendadas):');
     console.log('   - SMTP_USER (tu API key de Brevo)');
     console.log('   - SMTP_PASS (tu API key de Brevo)');
-    console.log('   - EMAIL_FROM (dirección remitente)');
+    console.log('   FALLBACK (opcionales, solo si no tienes SMTP_USER/SMTP_PASS):');
+    console.log('   - EMAIL_USER (solo como fallback)');
+    console.log('   - EMAIL_PASSWORD (solo como fallback)');
   }
 
   // Enviar notificación de nuevo Trend (BCC masivo para eficiencia)
@@ -94,6 +139,11 @@ class EmailService {
     });
     
     try {
+      // Validar EMAIL_FROM antes de enviar
+      if (!process.env.EMAIL_FROM || !process.env.EMAIL_FROM.trim()) {
+        console.warn('⚠️ [EmailService] EMAIL_FROM no está definido. El envío puede fallar.');
+      }
+
       console.log('📬 [EmailService] Verificando configuración de email...', {
         hasTransporter: !!this.transporter,
         emailDisabled: String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true',
@@ -101,7 +151,9 @@ class EmailService {
         hasSmtpPort: !!process.env.SMTP_PORT,
         hasSmtpUser: !!process.env.SMTP_USER,
         hasSmtpPass: !!process.env.SMTP_PASS,
-        emailFrom: process.env.EMAIL_FROM || 'NO DEFINIDO',
+        hasEmailUser: !!process.env.EMAIL_USER,
+        hasEmailPassword: !!process.env.EMAIL_PASSWORD,
+        emailFrom: process.env.EMAIL_FROM || '⚠️ NO DEFINIDO',
       });
       if (!Array.isArray(recipients) || recipients.length === 0) {
         console.warn('[EmailService] Notificación omitida: lista de destinatarios vacía.');
@@ -111,7 +163,7 @@ class EmailService {
       if (!this.transporter) {
         console.warn('✉️ Notificación de Trend omitida (email deshabilitado).');
         console.warn('   Verifica que EMAIL_DISABLED no esté en "true" y que tengas configuradas las variables de email.');
-        console.warn('   Variables necesarias: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM');
+        console.warn('   Variables necesarias: SMTP_HOST, SMTP_PORT, SMTP_USER + SMTP_PASS (o EMAIL_USER + EMAIL_PASSWORD), EMAIL_FROM');
         return { skipped: true };
       }
 
@@ -158,10 +210,16 @@ class EmailService {
       if (quickLink || link) textLines.push(`Acceso rápido: ${quickLink || link}`);
       const text = textLines.join('\n');
 
-      const toPlaceholder = process.env.EMAIL_FROM || recipients[0] || 'no-reply@antomia.local';
+      // Usar EMAIL_FROM o fallback
+      const emailFrom = process.env.EMAIL_FROM || recipients[0] || 'no-reply@antomia.local';
+      if (!process.env.EMAIL_FROM) {
+        console.warn('⚠️ [EmailService] EMAIL_FROM no definido, usando fallback:', emailFrom);
+      }
+
+      const toPlaceholder = emailFrom.includes('@') ? emailFrom : recipients[0] || 'no-reply@antomia.local';
 
       const mailOptions = {
-        from: process.env.EMAIL_FROM,
+        from: process.env.EMAIL_FROM || emailFrom,
         to: toPlaceholder, // placeholder
         bcc: recipients,
         subject,
@@ -171,7 +229,7 @@ class EmailService {
 
       console.log('📬 [EmailService] Preparando envío de correo...', {
         subject,
-        from: process.env.EMAIL_FROM,
+        from: process.env.EMAIL_FROM || emailFrom,
         toPlaceholder,
         bccCount: recipients.length,
         bccRecipients: recipients,
@@ -208,8 +266,12 @@ class EmailService {
 
       const resetUrl = `${process.env.FRONTEND_URL}/change-password?token=${resetToken}`;
       
+      if (!process.env.EMAIL_FROM) {
+        console.warn('⚠️ [EmailService] EMAIL_FROM no definido para email de recuperación.');
+      }
+
       const mailOptions = {
-        from: process.env.EMAIL_FROM,
+        from: process.env.EMAIL_FROM || 'no-reply@antomia.local',
         to: email,
         subject: 'Recuperar Contraseña - ANTOMIA',
         html: this.getPasswordResetEmailTemplate(userName, resetUrl),
@@ -231,8 +293,12 @@ class EmailService {
       // Envío de emails deshabilitado por requerimiento: no se envía correo
       return { skipped: true };
 
+      if (!process.env.EMAIL_FROM) {
+        console.warn('⚠️ [EmailService] EMAIL_FROM no definido para email de confirmación.');
+      }
+
       const mailOptions = {
-        from: process.env.EMAIL_FROM,
+        from: process.env.EMAIL_FROM || 'no-reply@antomia.local',
         to: email,
         subject: 'Contraseña Actualizada - ANTOMIA',
         html: this.getPasswordChangeConfirmationTemplate(userName),
