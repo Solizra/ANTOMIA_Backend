@@ -79,18 +79,44 @@ class EmailService {
         return;
       }
 
-      this.transporter = nodemailer.createTransport({
+      // Configurar según el puerto: 465 usa secure, 587 usa requireTLS
+      const isSecurePort = smtpPort === 465;
+      const isTlsPort = smtpPort === 587;
+
+      const transportConfig = {
         host: smtpHost,
         port: smtpPort,
         auth: {
           user: finalUser,
           pass: finalPass
         }
-      });
+      };
+
+      // Configuración para puerto 465 (SSL/TLS implícito)
+      if (isSecurePort) {
+        transportConfig.secure = true;
+        console.log('[EmailService] Configurando para puerto 465 (secure: true)');
+      }
+      // Configuración para puerto 587 (STARTTLS)
+      else if (isTlsPort) {
+        transportConfig.secure = false;
+        transportConfig.requireTLS = true;
+        console.log('[EmailService] Configurando para puerto 587 (secure: false, requireTLS: true)');
+      }
+      // Para otros puertos, usar configuración por defecto
+      else {
+        transportConfig.secure = false;
+        console.warn(`⚠️ [EmailService] Puerto ${smtpPort} no es estándar. Usando configuración por defecto (secure: false).`);
+        console.warn('   Puertos recomendados: 465 (SSL) o 587 (STARTTLS)');
+      }
+
+      this.transporter = nodemailer.createTransport(transportConfig);
 
       console.log('[EmailService] ✅ Transporter creado usando configuración Brevo.', {
         host: smtpHost,
         port: smtpPort,
+        secure: transportConfig.secure,
+        requireTLS: transportConfig.requireTLS || false,
         user: finalUser ? '[set]' : '[missing]',
         usingFallback: usingFallback ? 'EMAIL_USER/EMAIL_PASSWORD' : 'SMTP_USER/SMTP_PASS',
       });
@@ -108,9 +134,18 @@ class EmailService {
     }
     console.log(`[EmailService] Verificando transporter (${mode})...`);
     this.transporter.verify().then(() => {
-      console.log(`✅ Email service configurado correctamente (${mode})`);
+      console.log(`✅ [EmailService] Email service configurado correctamente (${mode})`);
+      console.log(`   La conexión SMTP está funcionando correctamente.`);
     }).catch((error) => {
-      console.error('❌ Error configurando email service (no bloqueante):', error?.code || error?.message || error);
+      console.error('❌ [EmailService] Error verificando conexión SMTP (no bloqueante):', error?.code || error?.message || error);
+      if (error?.code) {
+        console.error(`   Código de error: ${error.code}`);
+      }
+      if (error?.command) {
+        console.error(`   Comando fallido: ${error.command}`);
+      }
+      console.warn('   ⚠️ El servicio continuará funcionando, pero la verificación de conexión falló.');
+      console.warn('   Verifica que SMTP_HOST, SMTP_PORT, SMTP_USER y SMTP_PASS estén correctos.');
     });
   }
 
