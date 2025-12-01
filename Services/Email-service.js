@@ -1,34 +1,37 @@
-import nodemailer from 'nodemailer';
-
 class EmailService {
   constructor() {
-    console.log('🔧 [EmailService] Constructor - Inicializando EmailService');
-    this.transporter = null;
-    this.initializeTransporter();
-    console.log('🔧 [EmailService] Constructor - EmailService inicializado, transporter:', this.transporter ? '✅ Configurado' : '❌ No configurado');
+    console.log('🔧 [EmailService] Constructor - Inicializando EmailService con API de Brevo');
+    this.apiKey = null;
+    this.isServiceEnabled = false;
+    this.initializeService();
+    console.log('🔧 [EmailService] Constructor - EmailService inicializado:', this.isServiceEnabled ? '✅ Configurado' : '❌ No configurado');
   }
 
   isEnabled() {
-    return !!this.transporter;
+    return this.isServiceEnabled;
   }
 
-  initializeTransporter() {
+  initializeService() {
     try {
       const emailDisabled = String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true';
-      console.log('[EmailService] Inicializando transporter...', {
+      console.log('[EmailService] Inicializando servicio de email...', {
         emailDisabled,
-        hasSmtpHost: !!process.env.SMTP_HOST,
-        hasSmtpPort: !!process.env.SMTP_PORT,
-        hasSmtpUser: !!process.env.SMTP_USER,
-        hasSmtpPass: !!process.env.SMTP_PASS,
-        hasEmailUser: !!process.env.EMAIL_USER,
-        hasEmailPassword: !!process.env.EMAIL_PASSWORD,
+        hasBrevoApiKey: !!process.env.BREVO_API_KEY,
         hasEmailFrom: !!process.env.EMAIL_FROM,
       });
       
       if (emailDisabled) {
-        this.transporter = null;
+        this.isServiceEnabled = false;
         console.warn('⚠️ Email deshabilitado: EMAIL_DISABLED habilitado. El sistema continuará sin enviar correos.');
+        return;
+      }
+
+      // Validar BREVO_API_KEY (obligatorio)
+      const apiKey = (process.env.BREVO_API_KEY || '').trim();
+      if (!apiKey) {
+        this.isServiceEnabled = false;
+        console.warn('⚠️ Email deshabilitado: BREVO_API_KEY no está definido.');
+        console.warn('   Define BREVO_API_KEY con tu API key de Brevo para habilitar el envío de correos.');
         return;
       }
 
@@ -38,129 +41,111 @@ class EmailService {
         console.warn('   Define EMAIL_FROM con la dirección remitente (ej: "ANTOMIA" <ia.antom2025@gmail.com>)');
       }
 
-      // Intentar usar SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS primero (configuración principal)
-      const smtpHost = (process.env.SMTP_HOST || '').trim();
-      const smtpPort = parseInt(process.env.SMTP_PORT, 10);
-      const smtpUser = (process.env.SMTP_USER || '').trim();
-      const smtpPass = (process.env.SMTP_PASS || '').trim();
+      this.apiKey = apiKey;
+      this.isServiceEnabled = true;
 
-      // Fallback a EMAIL_USER/EMAIL_PASSWORD si faltan SMTP_USER/SMTP_PASS
-      const emailUser = (process.env.EMAIL_USER || '').trim();
-      const emailPassword = (process.env.EMAIL_PASSWORD || '').trim();
-
-      // Determinar qué credenciales usar
-      let finalUser, finalPass, usingFallback = false;
-      
-      if (smtpUser && smtpPass) {
-        finalUser = smtpUser;
-        finalPass = smtpPass;
-        console.log('[EmailService] Usando SMTP_USER y SMTP_PASS (configuración principal)');
-      } else if (emailUser && emailPassword) {
-        finalUser = emailUser;
-        finalPass = emailPassword;
-        usingFallback = true;
-        console.warn('⚠️ [EmailService] Usando EMAIL_USER y EMAIL_PASSWORD como fallback.');
-        console.warn('   Se recomienda usar SMTP_USER y SMTP_PASS para mejor compatibilidad con Brevo.');
-      } else {
-        this.transporter = null;
-        console.warn('⚠️ Email deshabilitado: faltan credenciales de autenticación.');
-        console.warn('   Variables necesarias: SMTP_USER + SMTP_PASS (o EMAIL_USER + EMAIL_PASSWORD como fallback)');
-        return;
-      }
-
-      // Validar host y port
-      if (!smtpHost || !smtpPort || isNaN(smtpPort)) {
-        this.transporter = null;
-        console.warn('⚠️ Email deshabilitado: faltan SMTP_HOST o SMTP_PORT.');
-        console.warn('   Variables necesarias: SMTP_HOST, SMTP_PORT');
-        if (usingFallback) {
-          console.warn('   Nota: Aunque tengas EMAIL_USER/EMAIL_PASSWORD, aún necesitas SMTP_HOST y SMTP_PORT.');
-        }
-        return;
-      }
-
-      // Configurar según el puerto: 465 usa secure, 587 usa requireTLS
-      const isSecurePort = smtpPort === 465;
-      const isTlsPort = smtpPort === 587;
-
-      const transportConfig = {
-        host: smtpHost,
-        port: smtpPort,
-        auth: {
-          user: finalUser,
-          pass: finalPass
-        }
-      };
-
-      // Configuración para puerto 465 (SSL/TLS implícito)
-      if (isSecurePort) {
-        transportConfig.secure = true;
-        console.log('[EmailService] Configurando para puerto 465 (secure: true)');
-      }
-      // Configuración para puerto 587 (STARTTLS)
-      else if (isTlsPort) {
-        transportConfig.secure = false;
-        transportConfig.requireTLS = true;
-        console.log('[EmailService] Configurando para puerto 587 (secure: false, requireTLS: true)');
-      }
-      // Para otros puertos, usar configuración por defecto
-      else {
-        transportConfig.secure = false;
-        console.warn(`⚠️ [EmailService] Puerto ${smtpPort} no es estándar. Usando configuración por defecto (secure: false).`);
-        console.warn('   Puertos recomendados: 465 (SSL) o 587 (STARTTLS)');
-      }
-
-      this.transporter = nodemailer.createTransport(transportConfig);
-
-      console.log('[EmailService] ✅ Transporter creado usando configuración Brevo.', {
-        host: smtpHost,
-        port: smtpPort,
-        secure: transportConfig.secure,
-        requireTLS: transportConfig.requireTLS || false,
-        user: finalUser ? '[set]' : '[missing]',
-        usingFallback: usingFallback ? 'EMAIL_USER/EMAIL_PASSWORD' : 'SMTP_USER/SMTP_PASS',
+      console.log('[EmailService] ✅ Servicio configurado correctamente usando API de Brevo.', {
+        hasApiKey: !!this.apiKey,
+        emailFrom: process.env.EMAIL_FROM || '⚠️ NO DEFINIDO',
       });
-      this.verifyTransporter('Brevo SMTP');
     } catch (error) {
       console.error('❌ Error inicializando email service:', error);
-      this.transporter = null;
+      this.isServiceEnabled = false;
     }
-  }
-
-  verifyTransporter(mode = 'SMTP') {
-    if (!this.transporter) {
-      console.warn('✉️ verifyTransporter omitido: transporter inexistente.');
-      return;
-    }
-    console.log(`[EmailService] Verificando transporter (${mode})...`);
-    this.transporter.verify().then(() => {
-      console.log(`✅ [EmailService] Email service configurado correctamente (${mode})`);
-      console.log(`   La conexión SMTP está funcionando correctamente.`);
-    }).catch((error) => {
-      console.error('❌ [EmailService] Error verificando conexión SMTP (no bloqueante):', error?.code || error?.message || error);
-      if (error?.code) {
-        console.error(`   Código de error: ${error.code}`);
-      }
-      if (error?.command) {
-        console.error(`   Comando fallido: ${error.command}`);
-      }
-      console.warn('   ⚠️ El servicio continuará funcionando, pero la verificación de conexión falló.');
-      console.warn('   Verifica que SMTP_HOST, SMTP_PORT, SMTP_USER y SMTP_PASS estén correctos.');
-    });
   }
 
   logEmailConfigHint() {
     console.log('ℹ️ Configura el envío de correos definiendo las siguientes variables:');
     console.log('   OBLIGATORIAS:');
+    console.log('   - BREVO_API_KEY (tu API key de Brevo)');
     console.log('   - EMAIL_FROM (dirección remitente, ej: "ANTOMIA" <ia.antom2025@gmail.com>)');
-    console.log('   - SMTP_HOST (ej: smtp-relay.brevo.com)');
-    console.log('   - SMTP_PORT (ej: 587)');
-    console.log('   PRINCIPALES (recomendadas):');
-    console.log('   - SMTP_USER (tu API key de Brevo)');
-    console.log('   - SMTP_PASS (tu API key de Brevo)');
-    console.log('   FALLBACK (opcionales, solo si no tienes SMTP_USER/SMTP_PASS):');
-    console.log('   - EMAIL_USER (solo como fallback)');
-    console.log('   - EMAIL_PASSWORD (solo como fallback)');
+  }
+
+  /**
+   * Método privado para enviar emails usando la API de Brevo
+   * @param {Object} emailData - Datos del email
+   * @param {string|Array} emailData.to - Email(s) destinatario(s)
+   * @param {Array} emailData.bcc - Email(s) en BCC (opcional)
+   * @param {string} emailData.subject - Asunto del email
+   * @param {string} emailData.html - Contenido HTML
+   * @param {string} emailData.text - Contenido texto plano (opcional)
+   * @returns {Promise<Object>} Resultado del envío
+   */
+  async sendEmailViaBrevoAPI({ to, bcc, subject, html, text }) {
+    const emailFrom = process.env.EMAIL_FROM || 'no-reply@antomia.local';
+    
+    // Parsear EMAIL_FROM si tiene formato "Nombre" <email@domain.com>
+    let senderName = 'ANTOMIA';
+    let senderEmail = emailFrom;
+    
+    if (emailFrom.includes('<') && emailFrom.includes('>')) {
+      const match = emailFrom.match(/^"?([^"<]+)"?\s*<(.+)>$/);
+      if (match) {
+        senderName = match[1].trim();
+        senderEmail = match[2].trim();
+      }
+    } else if (emailFrom.includes('@')) {
+      senderEmail = emailFrom;
+    }
+
+    // Convertir 'to' a array si es string
+    const toArray = Array.isArray(to) ? to : [{ email: to }];
+    
+    // Preparar destinatarios
+    const recipients = toArray.map(email => {
+      if (typeof email === 'string') {
+        return { email };
+      }
+      return email;
+    });
+
+    // Preparar BCC si existe
+    const bccArray = bcc && Array.isArray(bcc) && bcc.length > 0
+      ? bcc.map(email => (typeof email === 'string' ? { email } : email))
+      : undefined;
+
+    const payload = {
+      sender: {
+        name: senderName,
+        email: senderEmail
+      },
+      to: recipients,
+      subject: subject,
+      htmlContent: html
+    };
+
+    // Agregar BCC si existe
+    if (bccArray && bccArray.length > 0) {
+      payload.bcc = bccArray;
+    }
+
+    // Agregar texto plano si existe
+    if (text) {
+      payload.textContent = text;
+    }
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': this.apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      const errorMessage = responseData.message || responseData.error || `HTTP ${response.status}`;
+      throw new Error(`Brevo API error: ${errorMessage}`);
+    }
+
+    return {
+      messageId: responseData.messageId,
+      response: responseData,
+      success: true
+    };
   }
 
   // Enviar notificación de nuevo Trend (BCC masivo para eficiencia)
@@ -180,25 +165,21 @@ class EmailService {
       }
 
       console.log('📬 [EmailService] Verificando configuración de email...', {
-        hasTransporter: !!this.transporter,
+        isServiceEnabled: this.isServiceEnabled,
         emailDisabled: String(process.env.EMAIL_DISABLED || '').toLowerCase() === 'true',
-        hasSmtpHost: !!process.env.SMTP_HOST,
-        hasSmtpPort: !!process.env.SMTP_PORT,
-        hasSmtpUser: !!process.env.SMTP_USER,
-        hasSmtpPass: !!process.env.SMTP_PASS,
-        hasEmailUser: !!process.env.EMAIL_USER,
-        hasEmailPassword: !!process.env.EMAIL_PASSWORD,
+        hasBrevoApiKey: !!process.env.BREVO_API_KEY,
         emailFrom: process.env.EMAIL_FROM || '⚠️ NO DEFINIDO',
       });
+
       if (!Array.isArray(recipients) || recipients.length === 0) {
         console.warn('[EmailService] Notificación omitida: lista de destinatarios vacía.');
         return { skipped: true, reason: 'sin destinatarios' };
       }
 
-      if (!this.transporter) {
+      if (!this.isServiceEnabled) {
         console.warn('✉️ Notificación de Trend omitida (email deshabilitado).');
         console.warn('   Verifica que EMAIL_DISABLED no esté en "true" y que tengas configuradas las variables de email.');
-        console.warn('   Variables necesarias: SMTP_HOST, SMTP_PORT, SMTP_USER + SMTP_PASS (o EMAIL_USER + EMAIL_PASSWORD), EMAIL_FROM');
+        console.warn('   Variables necesarias: BREVO_API_KEY, EMAIL_FROM');
         return { skipped: true };
       }
 
@@ -253,15 +234,6 @@ class EmailService {
 
       const toPlaceholder = emailFrom.includes('@') ? emailFrom : recipients[0] || 'no-reply@antomia.local';
 
-      const mailOptions = {
-        from: process.env.EMAIL_FROM || emailFrom,
-        to: toPlaceholder, // placeholder
-        bcc: recipients,
-        subject,
-        html,
-        text
-      };
-
       console.log('📬 [EmailService] Preparando envío de correo...', {
         subject,
         from: process.env.EMAIL_FROM || emailFrom,
@@ -271,33 +243,71 @@ class EmailService {
         hasQuickLink: Boolean(quickLink),
       });
 
-      console.log('📬 [EmailService] Llamando a transporter.sendMail()...');
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ [EmailService] Notificación de nuevo Trend enviada a ${recipients.length} destinatarios`);
-      console.log(`   Destinatarios: ${recipients.join(', ')}`);
-      console.log(`   MessageId: ${result.messageId || 'N/A'}`);
-      console.log(`   Response: ${result.response || 'N/A'}`);
-      console.log('📬 [EmailService] sendNewTrendNotification - COMPLETADO EXITOSAMENTE');
-      return result;
+      console.log('📬 [EmailService] Llamando a API de Brevo...');
+      
+      // Reintento máximo 2 veces para el envío de email (no afecta el análisis)
+      const maxRetries = 2;
+      let lastError = null;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          if (attempt > 1) {
+            console.log(`📬 [EmailService] Reintento ${attempt}/${maxRetries} de envío de email...`);
+            // Esperar 2 segundos antes de reintentar
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          
+          const result = await this.sendEmailViaBrevoAPI({
+            to: toPlaceholder,
+            bcc: recipients,
+            subject,
+            html,
+            text
+          });
+
+          console.log(`✅ [EmailService] Notificación de nuevo Trend enviada a ${recipients.length} destinatarios (intento ${attempt})`);
+          console.log(`   Destinatarios: ${recipients.join(', ')}`);
+          console.log(`   MessageId: ${result.messageId || 'N/A'}`);
+          console.log(`   Response: ${JSON.stringify(result.response || {})}`);
+          console.log('📬 [EmailService] sendNewTrendNotification - COMPLETADO EXITOSAMENTE');
+          return result;
+        } catch (sendError) {
+          lastError = sendError;
+          console.warn(`⚠️ [EmailService] Error en intento ${attempt}/${maxRetries} de envío:`, sendError?.message || sendError);
+          
+          // Si es el último intento, lanzar el error
+          if (attempt === maxRetries) {
+            throw sendError;
+          }
+          
+          // Si no es el último intento, continuar al siguiente
+          console.log(`   Reintentando envío de email...`);
+        }
+      }
+      
+      // Esto no debería ejecutarse, pero por seguridad
+      throw lastError || new Error('Error desconocido en envío de email');
     } catch (error) {
       console.error('❌ Error enviando notificación de Trend:', error);
       console.error('   Error completo:', {
         message: error?.message,
-        code: error?.code,
-        command: error?.command,
-        response: error?.response,
-        responseCode: error?.responseCode,
         stack: error?.stack
       });
       // No lanzar el error para que no rompa el flujo de creación de trends
       return { error: true, message: error?.message || 'Error desconocido' };
     }
   }
+
   // Enviar email de recuperación de contraseña
   async sendPasswordResetEmail(email, resetToken, userName = 'Usuario') {
     try {
       // Envío de emails deshabilitado por requerimiento: no se envía correo
       return { skipped: true };
+
+      if (!this.isServiceEnabled) {
+        console.warn('⚠️ [EmailService] Servicio de email deshabilitado. Email de recuperación omitido.');
+        return { skipped: true };
+      }
 
       const resetUrl = `${process.env.FRONTEND_URL}/change-password?token=${resetToken}`;
       
@@ -305,15 +315,17 @@ class EmailService {
         console.warn('⚠️ [EmailService] EMAIL_FROM no definido para email de recuperación.');
       }
 
-      const mailOptions = {
-        from: process.env.EMAIL_FROM || 'no-reply@antomia.local',
-        to: email,
-        subject: 'Recuperar Contraseña - ANTOMIA',
-        html: this.getPasswordResetEmailTemplate(userName, resetUrl),
-        text: this.getPasswordResetEmailText(userName, resetUrl)
-      };
+      const subject = 'Recuperar Contraseña - ANTOMIA';
+      const html = this.getPasswordResetEmailTemplate(userName, resetUrl);
+      const text = this.getPasswordResetEmailText(userName, resetUrl);
 
-      const result = await this.transporter.sendMail(mailOptions);
+      const result = await this.sendEmailViaBrevoAPI({
+        to: email,
+        subject,
+        html,
+        text
+      });
+
       console.log('✅ Email de recuperación enviado a:', email);
       return result;
     } catch (error) {
@@ -328,19 +340,26 @@ class EmailService {
       // Envío de emails deshabilitado por requerimiento: no se envía correo
       return { skipped: true };
 
+      if (!this.isServiceEnabled) {
+        console.warn('⚠️ [EmailService] Servicio de email deshabilitado. Email de confirmación omitido.');
+        return { skipped: true };
+      }
+
       if (!process.env.EMAIL_FROM) {
         console.warn('⚠️ [EmailService] EMAIL_FROM no definido para email de confirmación.');
       }
 
-      const mailOptions = {
-        from: process.env.EMAIL_FROM || 'no-reply@antomia.local',
-        to: email,
-        subject: 'Contraseña Actualizada - ANTOMIA',
-        html: this.getPasswordChangeConfirmationTemplate(userName),
-        text: this.getPasswordChangeConfirmationText(userName)
-      };
+      const subject = 'Contraseña Actualizada - ANTOMIA';
+      const html = this.getPasswordChangeConfirmationTemplate(userName);
+      const text = this.getPasswordChangeConfirmationText(userName);
 
-      const result = await this.transporter.sendMail(mailOptions);
+      const result = await this.sendEmailViaBrevoAPI({
+        to: email,
+        subject,
+        html,
+        text
+      });
+
       console.log('✅ Email de confirmación enviado a:', email);
       return result;
     } catch (error) {

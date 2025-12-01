@@ -103,10 +103,20 @@ export default class TrendsService {
         return created;
       }
 
-      console.log('📧 [TrendsService] Trend NO es duplicado. Procediendo a enviar notificación por email...');
-      console.log('📧 [TrendsService] Llamando a notifyNewTrend DESPUÉS de insertar en BD...');
-      await this.notifyNewTrend(created, payload);
-      console.log('✅ [TrendsService] notifyNewTrend completado. createAsync finalizado exitosamente.');
+      // IMPORTANTE: El análisis ya está hecho y guardado en BD.
+      // El envío de email es independiente y no debe bloquear ni repetir el análisis.
+      console.log('📧 [TrendsService] Trend NO es duplicado. Enviando notificación por email de forma asíncrona...');
+      console.log('📧 [TrendsService] El análisis ya está completo y guardado en BD. El email se enviará en segundo plano.');
+      
+      // Ejecutar notificación de email de forma asíncrona (fire and forget)
+      // Esto asegura que el análisis no se repita aunque el email falle
+      this.notifyNewTrend(created, payload).catch((emailError) => {
+        // El error ya se maneja dentro de notifyNewTrend, esto es solo un catch de seguridad
+        console.error('❌ [TrendsService] Error crítico en notificación de email (no afecta el análisis):', emailError?.message || emailError);
+      });
+      
+      console.log('✅ [TrendsService] createAsync finalizado exitosamente. El trend está guardado en BD.');
+      console.log('   La notificación de email se está procesando en segundo plano.');
       return created;
     } catch (error) {
       console.error('❌ [TrendsService] Error en createAsync:', error);
@@ -206,8 +216,10 @@ export default class TrendsService {
   }
 
   async notifyNewTrend(createdTrend, sourcePayload = {}) {
+    // IMPORTANTE: Esta función solo envía emails. El análisis ya está completo y guardado en BD.
+    // Si el email falla, el análisis NO se repite. Esta función es independiente del análisis.
     try {
-      console.log('📧 [TrendsService] notifyNewTrend - INICIANDO');
+      console.log('📧 [TrendsService] notifyNewTrend - INICIANDO (solo envío de email, análisis ya completo)');
       console.log('📧 [TrendsService] Trend recibido:', {
         id: createdTrend?.id,
         titulo: createdTrend?.['Título_del_Trend'],
